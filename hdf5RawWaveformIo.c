@@ -2,17 +2,18 @@
 #include <stdlib.h>
 #include <hdf5.h>
 #include "waveform.h"
-#include "hdf5io.h"
+#include "hdf5rawWaveformIo.h"
 
-struct hdf5io_waveform_file *hdf5io_open_file(const char *fname,
-                                              size_t nWfmPerChunk,
-                                              size_t nCh)
+struct hdf5rawWaveformIo_waveform_file *hdf5rawWaveformIo_open_file(const char *fname,
+                                                                    size_t nWfmPerChunk,
+                                                                    size_t nCh)
 {
     hid_t rootGid, attrSid, attrAid;
     herr_t ret;
 
-    struct hdf5io_waveform_file *wavFile;
-    wavFile = (struct hdf5io_waveform_file *)malloc(sizeof(struct hdf5io_waveform_file));
+    struct hdf5rawWaveformIo_waveform_file *wavFile;
+    wavFile = (struct hdf5rawWaveformIo_waveform_file *)
+        malloc(sizeof(struct hdf5rawWaveformIo_waveform_file));
     wavFile->waveFid = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     wavFile->nWfmPerChunk = nWfmPerChunk;
     wavFile->nCh = nCh;
@@ -44,13 +45,14 @@ struct hdf5io_waveform_file *hdf5io_open_file(const char *fname,
     return wavFile;
 }
 
-struct hdf5io_waveform_file *hdf5io_open_file_for_read(const char *fname)
+struct hdf5rawWaveformIo_waveform_file *hdf5rawWaveformIo_open_file_for_read(const char *fname)
 {
     hid_t attrAid;
     herr_t ret;
 
-    struct hdf5io_waveform_file *wavFile;
-    wavFile = (struct hdf5io_waveform_file *)malloc(sizeof(struct hdf5io_waveform_file));
+    struct hdf5rawWaveformIo_waveform_file *wavFile;
+    wavFile = (struct hdf5rawWaveformIo_waveform_file *)
+        malloc(sizeof(struct hdf5rawWaveformIo_waveform_file));
     wavFile->waveFid = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
 
     attrAid = H5Aopen_by_name(wavFile->waveFid, "/", "nEvents",
@@ -70,7 +72,7 @@ struct hdf5io_waveform_file *hdf5io_open_file_for_read(const char *fname)
     return wavFile;
 }
 
-int hdf5io_close_file(struct hdf5io_waveform_file *wavFile)
+int hdf5rawWaveformIo_close_file(struct hdf5rawWaveformIo_waveform_file *wavFile)
 {
     herr_t ret;
 
@@ -79,7 +81,7 @@ int hdf5io_close_file(struct hdf5io_waveform_file *wavFile)
     return (int)ret;
 }
 
-int hdf5io_flush_file(struct hdf5io_waveform_file *wavFile)
+int hdf5rawWaveformIo_flush_file(struct hdf5rawWaveformIo_waveform_file *wavFile)
 {
     hid_t attrAid;
     herr_t ret;
@@ -93,8 +95,9 @@ int hdf5io_flush_file(struct hdf5io_waveform_file *wavFile)
     return (int)ret;
 }
 
-int hdf5io_write_waveform_attribute_in_file_header(struct hdf5io_waveform_file *wavFile,
-                                                   struct waveform_attribute *wavAttr)
+int hdf5rawWaveformIo_write_waveform_attribute_in_file_header(
+    struct hdf5rawWaveformIo_waveform_file *wavFile,
+    struct waveform_attribute *wavAttr)
 {
     herr_t ret;
     
@@ -140,8 +143,9 @@ int hdf5io_write_waveform_attribute_in_file_header(struct hdf5io_waveform_file *
     return (int)ret;
 }
 
-int hdf5io_read_waveform_attribute_in_file_header(struct hdf5io_waveform_file *wavFile,
-                                                  struct waveform_attribute *wavAttr)
+int hdf5rawWaveformIo_read_waveform_attribute_in_file_header(
+    struct hdf5rawWaveformIo_waveform_file *wavFile,
+    struct waveform_attribute *wavAttr)
 {
     herr_t ret;
 
@@ -180,10 +184,10 @@ int hdf5io_read_waveform_attribute_in_file_header(struct hdf5io_waveform_file *w
     return (int)ret;
 }
 
-int hdf5io_write_event(struct hdf5io_waveform_file *wavFile,
-                       struct hdf5io_waveform_event *wavEvent)
+int hdf5rawWaveformIo_write_event(struct hdf5rawWaveformIo_waveform_file *wavFile,
+                                  struct hdf5rawWaveformIo_waveform_event *wavEvent)
 {
-    char buf[HDF5IO_NAME_BUF_SIZE];
+    char buf[HDF5RAWWAVEFORMIO_NAME_BUF_SIZE];
     herr_t ret;
     size_t chunkId, inChunkId;
     hid_t rootGid, chSid, chPid, chTid, chDid;
@@ -193,10 +197,10 @@ int hdf5io_write_event(struct hdf5io_waveform_file *wavFile,
     chunkId = wavEvent->eventId / wavFile->nWfmPerChunk;
     inChunkId = wavEvent->eventId % wavFile->nWfmPerChunk;
 
-    snprintf(buf, HDF5IO_NAME_BUF_SIZE, "C%zd", chunkId);
+    snprintf(buf, HDF5RAWWAVEFORMIO_NAME_BUF_SIZE, "C%zd", chunkId);
     rootGid = H5Gopen(wavFile->waveFid, "/", H5P_DEFAULT);
 
-#define hdf5io_write_event_create_dataset                   \
+#define hdf5rawWaveformIo_write_event_create_dataset                   \
     do {                                                    \
         dims[0] = wavFile->nCh;                             \
         dims[1] = wavFile->nPt * wavFile->nWfmPerChunk;     \
@@ -217,19 +221,19 @@ int hdf5io_write_event(struct hdf5io_waveform_file *wavFile,
     } while(0)
 
     if(inChunkId == 0) { /* need to create a new chunk */
-        hdf5io_write_event_create_dataset;
+        hdf5rawWaveformIo_write_event_create_dataset;
     } else {
         chDid = H5Dopen(rootGid, buf, H5P_DEFAULT);
         if(chDid < 0) { /* need to create a new chunk */
             /* This is not a neat way to do it.  One may check out
              * H5Lexists() and try to utilize that function.  Its
              * efficiency is not verified though. */
-            hdf5io_write_event_create_dataset;
+            hdf5rawWaveformIo_write_event_create_dataset;
         } else {
             chSid = H5Dget_space(chDid);
         }
     }
-#undef hdf5io_write_event_create_dataset
+#undef hdf5rawWaveformIo_write_event_create_dataset
 
     slabOff[0] = 0;
     slabOff[1] = inChunkId * wavFile->nPt;
@@ -254,10 +258,10 @@ int hdf5io_write_event(struct hdf5io_waveform_file *wavFile,
     return (int)ret;
 }
 
-int hdf5io_read_event(struct hdf5io_waveform_file *wavFile,
-                      struct hdf5io_waveform_event *wavEvent)
+int hdf5rawWaveformIo_read_event(struct hdf5rawWaveformIo_waveform_file *wavFile,
+                                 struct hdf5rawWaveformIo_waveform_event *wavEvent)
 {
-    char buf[HDF5IO_NAME_BUF_SIZE];
+    char buf[HDF5RAWWAVEFORMIO_NAME_BUF_SIZE];
     herr_t ret;
     size_t chunkId, inChunkId;
     hid_t chSid, chDid;
@@ -267,7 +271,7 @@ int hdf5io_read_event(struct hdf5io_waveform_file *wavFile,
     chunkId = wavEvent->eventId / wavFile->nWfmPerChunk;
     inChunkId = wavEvent->eventId % wavFile->nWfmPerChunk;
 
-    snprintf(buf, HDF5IO_NAME_BUF_SIZE, "/C%zd", chunkId);
+    snprintf(buf, HDF5RAWWAVEFORMIO_NAME_BUF_SIZE, "/C%zd", chunkId);
     chDid = H5Dopen(wavFile->waveFid, buf, H5P_DEFAULT);
     chSid = H5Dget_space(chDid);
 
@@ -291,7 +295,7 @@ int hdf5io_read_event(struct hdf5io_waveform_file *wavFile,
     return (int)ret;
 }
 
-size_t hdf5io_get_number_of_events(struct hdf5io_waveform_file *wavFile)
+size_t hdf5rawWaveformIo_get_number_of_events(struct hdf5rawWaveformIo_waveform_file *wavFile)
 {
     /*
     herr_t ret;
@@ -309,7 +313,7 @@ size_t hdf5io_get_number_of_events(struct hdf5io_waveform_file *wavFile)
     return wavFile->nEvents;
 }
 
-#ifdef HDF5IO_DEBUG_ENABLEMAIN
+#ifdef HDF5RAWWAVEFORMIO_DEBUG_ENABLEMAIN
 int main(int argc, char **argv)
 {
     int i;
@@ -318,7 +322,7 @@ int main(int argc, char **argv)
                        11,12,13,14,15,
                        16,17,18,19,20};
 
-    struct hdf5io_waveform_file *wavFile;
+    struct hdf5rawWaveformIo_waveform_file *wavFile;
     struct waveform_attribute wavAttr = {
         .chMask = 0x0a,
         .nPt = 10000,
@@ -329,52 +333,52 @@ int main(int argc, char **argv)
         .yzero = {0,0,0,0}
     };
 
-    struct hdf5io_waveform_event evt = {
+    struct hdf5rawWaveformIo_waveform_event evt = {
         .eventId = 0,
         .wavBuf = (char*)array
     };
 
-    wavFile = hdf5io_open_file("test.h5", 4, 2);
+    wavFile = hdf5rawWaveformIo_open_file("test.h5", 4, 2);
     printf("wavFile->nWfmPerChunk = %zd\n", wavFile->nWfmPerChunk);
     printf("wavFile->nCh = %zd\n", wavFile->nCh);
     printf("wavFile->nPt = %zd\n", wavFile->nPt);
-    hdf5io_write_waveform_attribute_in_file_header(wavFile, &wavAttr);
+    hdf5rawWaveformIo_write_waveform_attribute_in_file_header(wavFile, &wavAttr);
     printf("wavFile->nPt = %zd\n", wavFile->nPt);
 
-    hdf5io_write_event(wavFile, &evt);
+    hdf5rawWaveformIo_write_event(wavFile, &evt);
     evt.eventId = 1;
-    hdf5io_write_event(wavFile, &evt);
+    hdf5rawWaveformIo_write_event(wavFile, &evt);
     evt.eventId = 4;
-    hdf5io_write_event(wavFile, &evt);
+    hdf5rawWaveformIo_write_event(wavFile, &evt);
     evt.eventId = 8;
-    hdf5io_write_event(wavFile, &evt);
+    hdf5rawWaveformIo_write_event(wavFile, &evt);
     evt.eventId = 9;
-    hdf5io_write_event(wavFile, &evt);
+    hdf5rawWaveformIo_write_event(wavFile, &evt);
 
-    hdf5io_flush_file(wavFile);
-    hdf5io_close_file(wavFile);
+    hdf5rawWaveformIo_flush_file(wavFile);
+    hdf5rawWaveformIo_close_file(wavFile);
 
-    wavFile = hdf5io_open_file_for_read("test.h5");
-    printf("number of events: %zd\n", hdf5io_get_number_of_events(wavFile));
+    wavFile = hdf5rawWaveformIo_open_file_for_read("test.h5");
+    printf("number of events: %zd\n", hdf5rawWaveformIo_get_number_of_events(wavFile));
     printf("wavFile->nWfmPerChunk = %zd\n", wavFile->nWfmPerChunk);
     printf("wavFile->nCh = %zd\n", wavFile->nCh);
     printf("wavFile->nPt = %zd\n", wavFile->nPt);
-    hdf5io_read_waveform_attribute_in_file_header(wavFile, &wavAttr);
+    hdf5rawWaveformIo_read_waveform_attribute_in_file_header(wavFile, &wavAttr);
     printf("wavFile->nPt = %zd\n", wavFile->nPt);
-    printf("number of events: %zd\n", hdf5io_get_number_of_events(wavFile));
+    printf("number of events: %zd\n", hdf5rawWaveformIo_get_number_of_events(wavFile));
     printf("%zd, %g, %g\n", wavAttr.nPt, wavAttr.dt, wavAttr.t0);
 
     for(i=0; i < wavFile->nCh * wavFile->nPt; i++) {
         evt.wavBuf[i] = 0;
     }
     evt.eventId = 1;
-    hdf5io_read_event(wavFile, &evt);
+    hdf5rawWaveformIo_read_event(wavFile, &evt);
     for(i=0; i < wavFile->nCh * wavFile->nPt; i++) {
         printf("%d ", evt.wavBuf[i]);
     }
     printf("\n");
     
-    hdf5io_close_file(wavFile);
+    hdf5rawWaveformIo_close_file(wavFile);
     
     return EXIT_SUCCESS;
 }

@@ -1,4 +1,4 @@
 
 These are copied from NetScope
-hdf5RawWaveformIo.h
-hdf5RawWaveformIo.c
+hdf5rawWaveformIo.h
+hdf5rawWaveformIo.c
