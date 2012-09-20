@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <hdf5.h>
-#include "waveform.h"
+#include "common.h"
 #include "hdf5rawWaveformIo.h"
 
 struct hdf5rawWaveformIo_waveform_file *hdf5rawWaveformIo_open_file(const char *fname,
