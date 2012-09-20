@@ -24,11 +24,26 @@ struct waveform_attribute
 
 typedef struct config_parameters
 {
-    int filter_respLen; /* should be an odd number */
+    int filter_respLen; /* response function length, should be an odd number */
     int filter_SavitzkyGolay_poly_order;
     int filter_SavitzkyGolay_derivative_degree;
-    
+    ANALYSIS_WAVEFORM_BASE_TYPE peakFinder_hThreshold; /* height threshold */
+    ANALYSIS_WAVEFORM_BASE_TYPE peakFinder_minSep; /* minimum separation between peaks */
+    /* fraction of peak height in the filtered waveform, in order to
+     * determin start and end points to do the integration */
+    ANALYSIS_WAVEFORM_BASE_TYPE peakFinder_integralFraction;
+    size_t baseLine_nSamples;
 } config_parameters_t;
+
+typedef struct peak_parameters
+{
+    ANALYSIS_WAVEFORM_BASE_TYPE pHeight; /* highest point */
+    ANALYSIS_WAVEFORM_BASE_TYPE pStart; /* start on the filtered peak */
+    ANALYSIS_WAVEFORM_BASE_TYPE pEnd; /* end on the filtered peak */
+    ANALYSIS_WAVEFORM_BASE_TYPE pTime; /* position of the highest point on the unfiltered peak */
+    ANALYSIS_WAVEFORM_BASE_TYPE pWidth; /* FWHM of the unfiltered peak */
+    ANALYSIS_WAVEFORM_BASE_TYPE pIntegral; /* integral of the unfiltered peak */
+} peak_parameters_t;
 
 /* utilities */
 #define bitsof(x) (8*sizeof(x))

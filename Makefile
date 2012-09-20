@@ -59,12 +59,13 @@ debug_exe_targets: $(DEBUG_EXE_TARGETS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
-analyzeWaveform: main.o filters.o runScriptNGetConfig.o hdf5rawWaveformIo.o
+analyzeWaveform: main.o filters.o peakFinder.o runScriptNGetConfig.o hdf5rawWaveformIo.o
 	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@
 main.o: main.c hdf5rawWaveformIo.h common.h
 filters.o: filters.c filters.h common.h
 filters: filters.c filters.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) -DFILTERS_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
+peakFinder.o: peakFinder.c peakFinder.h filters.h common.h
 runScriptNGetConfig.o: runScriptNGetConfig.c runScriptNGetConfig.h common.h
 hdf5rawWaveformIo.o: hdf5rawWaveformIo.c hdf5rawWaveformIo.h common.h
 hdf5rawWaveformIo: hdf5rawWaveformIo.c hdf5rawWaveformIo.h

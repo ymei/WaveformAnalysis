@@ -7,7 +7,7 @@
 #include <math.h>
 
 #include "common.h"
-#include "filters.h"
+#include "peakFinder.h"
 #include "runScriptNGetConfig.h"
 #include "hdf5rawWaveformIo.h"
 
@@ -16,6 +16,7 @@ RAW_WAVEFORM_BASE_TYPE *waveformBuf;
 int main(int argc, char **argv)
 {
     size_t i, j, iCh, iEvent=0, nEvents=0, iFrame=0, frameSize, nEventsInFile;
+    size_t nWaves2print=0, iWaves2print;
     char *inFileName;
     
     struct hdf5rawWaveformIo_waveform_file *waveformFile;
@@ -23,19 +24,23 @@ int main(int argc, char **argv)
     struct hdf5rawWaveformIo_waveform_event waveformEvent;
 
     config_parameters_t *cParms;
-    filters_t *fHdl;
+    peakfinder_t *pfHdl;
+    ANALYSIS_WAVEFORM_BASE_TYPE *inWav;
 
-    if(argc<2) {
-        fprintf(stderr, "%s inFileName [iEvent] [nEvents]\n", argv[0]);
+    if(argc<3) {
+        fprintf(stderr, "%s inFileName iCh [iEvent] [nEvents] [nWaves2print]\n", argv[0]);
         return EXIT_FAILURE;
     }
     
     inFileName = argv[1];
     waveformFile = hdf5rawWaveformIo_open_file_for_read(inFileName);
-    if(argc>2)
-        iEvent = atol(argv[2]);
+    iCh = atol(argv[2]);
     if(argc>3)
-        nEvents = atol(argv[3]);
+        iEvent = atol(argv[3]);
+    if(argc>4)
+        nEvents = atol(argv[4]);
+    if(argc>5)
+        nWaves2print = atol(argv[5]);
 
     hdf5rawWaveformIo_read_waveform_attribute_in_file_header(waveformFile, &waveformAttr);
     fprintf(stderr, "waveform_attribute:\n"
@@ -67,55 +72,53 @@ int main(int argc, char **argv)
                                                   * sizeof(RAW_WAVEFORM_BASE_TYPE));
     waveformEvent.wavBuf = waveformBuf;
 
+    inWav = (ANALYSIS_WAVEFORM_BASE_TYPE *)calloc(frameSize, sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
     cParms = get_config_parameters();
+    pfHdl = peakfinder_init(frameSize, 10, cParms);
 
-    fHdl = filters_init_for_convolution(frameSize, cParms->filter_respLen);
-    filters_SavitzkyGolay(fHdl, cParms->filter_SavitzkyGolay_poly_order,
-                          cParms->filter_SavitzkyGolay_derivative_degree);
-    filters_raisedCosine(fHdl);
-
-    iCh = 0;
+    iWaves2print = 0;
     for(waveformEvent.eventId = iEvent; waveformEvent.eventId < iEvent + nEvents;
         waveformEvent.eventId++) {
         hdf5rawWaveformIo_read_event(waveformFile, &waveformEvent);
         for(iFrame = 0; iFrame < waveformAttr.nFrames; iFrame++) {
             for(i=0; i<frameSize; i++) {
-                fHdl->inWav[i] = 101.5 - waveformBuf[iCh * waveformFile->nPt + iFrame * frameSize + i];
+                inWav[i] = (waveformBuf[iCh * waveformFile->nPt + iFrame * frameSize + i]
+                            - waveformAttr.yoff[iCh]) * waveformAttr.ymult[iCh];
             }
-            filters_convolute(fHdl);
-            for(i=0; i<frameSize; i++) {
-                printf("%24.16e %24.16e\n", fHdl->inWav[i], fHdl->outWav[i]);
+
+            peakfinder_baseline(pfHdl, inWav, 1);
+            peakfinder_find(pfHdl);
+
+            if(iWaves2print < nWaves2print) {
+                printf("# id %zd bl %g blSD %g nPeaks %zd", iWaves2print, pfHdl->baseLine,
+                       pfHdl->baseLineSD, pfHdl->nPeaks);
+                for(j=0; j<pfHdl->nPeaks; j++) {
+                    printf(" (( %g %g %g )( %g %g %g))", pfHdl->pParms[j].pStart, 
+                           pfHdl->pParms[j].pTime, pfHdl->pParms[j].pEnd,
+                           pfHdl->pParms[j].pHeight, pfHdl->pParms[j].pWidth,
+                           pfHdl->pParms[j].pIntegral);
+                }
+                printf("\n");
+                for(i=0; i<frameSize; i++) {
+                    printf("%24.16e %24.16e %24.16e\n", waveformAttr.dt*i, pfHdl->blsWav[i],
+                           pfHdl->fHdl->outWav[i]);
+                }
+                printf("\n\n");
+                iWaves2print++;
             }
-            printf("\n");
-        }
-        printf("\n");
-    }
 
-/*
-    for(waveformEvent.eventId = iEvent; waveformEvent.eventId < iEvent + nEvents;
-        waveformEvent.eventId++) {
-        hdf5rawWaveformIo_read_event(waveformFile, &waveformEvent);
-
-        for(i = 0; i < waveformFile->nPt; i++) {
-            printf("%24.16e ", waveformAttr.dt*(i%frameSize));
-            j = 0;
-            for(iCh=0; iCh<SCOPE_NCH; iCh++) {
-                if((1<<iCh) & waveformAttr.chMask) {
-                    printf("%24.16e ", (waveformBuf[j * waveformFile->nPt + i]
-                                        - waveformAttr.yoff[iCh]) * waveformAttr.ymult[iCh]);
-                    j++;
+            if(nWaves2print == 0) {
+                for(j=0; j<pfHdl->nPeaks; j++) {
+                    printf("%g %g\n", pfHdl->pParms[j].pTime, pfHdl->pParms[j].pIntegral);
                 }
             }
-            printf("\n");
-            if((i+1) % frameSize == 0)
-                printf("\n");
         }
-        printf("\n");
     }
-*/
+
     free(waveformBuf);
     hdf5rawWaveformIo_close_file(waveformFile);
-    filters_close(fHdl);
+    free(inWav);
+    peakfinder_close(pfHdl);
     free_config_parameters(cParms);
 
     return EXIT_SUCCESS;
