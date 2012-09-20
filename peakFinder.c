@@ -65,9 +65,9 @@ ANALYSIS_WAVEFORM_BASE_TYPE peakfinder_baseline(peakfinder_t *pfHdl,
 
 size_t peakfinder_find(peakfinder_t *pfHdl)
 {
-    size_t i, j, k, l, r;
+    size_t i, j, l, r;
     int p=0, inPeak;
-    ANALYSIS_WAVEFORM_BASE_TYPE max, sum;
+    ANALYSIS_WAVEFORM_BASE_TYPE max;
 
     for(i=0; i<pfHdl->wavLen; i++)
         pfHdl->fHdl->inWav[i] = pfHdl->blsWav[i];
