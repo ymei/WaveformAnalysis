@@ -17,7 +17,7 @@ int main(int argc, char **argv)
 {
     size_t i, j, iCh, iEvent=0, nEvents=0, iFrame=0, frameSize, nEventsInFile;
     size_t nWaves2print=0, iWaves2print;
-    char *inFileName;
+    char *configFileName, *inFileName;
     
     struct hdf5rawWaveformIo_waveform_file *waveformFile;
     struct waveform_attribute waveformAttr;
@@ -27,20 +27,21 @@ int main(int argc, char **argv)
     peakfinder_t *pfHdl;
     ANALYSIS_WAVEFORM_BASE_TYPE *inWav;
 
-    if(argc<3) {
-        fprintf(stderr, "%s inFileName iCh [iEvent] [nEvents] [nWaves2print]\n", argv[0]);
+    if(argc<4) {
+        fprintf(stderr, "%s config.scm inFileName iCh [iEvent] [nEvents] [nWaves2print]\n",argv[0]);
         return EXIT_FAILURE;
     }
-    
-    inFileName = argv[1];
+
+    configFileName = argv[1];
+    inFileName = argv[2];
     waveformFile = hdf5rawWaveformIo_open_file_for_read(inFileName);
-    iCh = atol(argv[2]);
-    if(argc>3)
-        iEvent = atol(argv[3]);
+    iCh = atol(argv[3]);
     if(argc>4)
-        nEvents = atol(argv[4]);
+        iEvent = atol(argv[4]);
+    if(argc>4)
+        nEvents = atol(argv[5]);
     if(argc>5)
-        nWaves2print = atol(argv[5]);
+        nWaves2print = atol(argv[6]);
 
     hdf5rawWaveformIo_read_waveform_attribute_in_file_header(waveformFile, &waveformAttr);
     fprintf(stderr, "waveform_attribute:\n"
@@ -73,14 +74,14 @@ int main(int argc, char **argv)
     waveformEvent.wavBuf = waveformBuf;
 
     inWav = (ANALYSIS_WAVEFORM_BASE_TYPE *)calloc(frameSize, sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
-    cParms = get_config_parameters();
+    cParms = get_config_parameters(configFileName);
     pfHdl = peakfinder_init(frameSize, 10, cParms);
 
     iWaves2print = 0;
     for(waveformEvent.eventId = iEvent; waveformEvent.eventId < iEvent + nEvents;
         waveformEvent.eventId++) {
         hdf5rawWaveformIo_read_event(waveformFile, &waveformEvent);
-        for(iFrame = 0; iFrame < waveformAttr.nFrames; iFrame++) {
+        for(iFrame = 0; iFrame < MAX(waveformAttr.nFrames, 1); iFrame++) {
             for(i=0; i<frameSize; i++) {
                 inWav[i] = (waveformBuf[iCh * waveformFile->nPt + iFrame * frameSize + i]
                             - waveformAttr.yoff[iCh]) * waveformAttr.ymult[iCh];
@@ -109,7 +110,9 @@ int main(int argc, char **argv)
 
             if(nWaves2print == 0) {
                 for(j=0; j<pfHdl->nPeaks; j++) {
-                    printf("%g %g\n", pfHdl->pParms[j].pTime, pfHdl->pParms[j].pIntegral);
+                    printf("%zd %zd %g %g %g %g\n", waveformEvent.eventId, iFrame,
+                           pfHdl->pParms[j].pTime, pfHdl->pParms[j].pIntegral,
+                           pfHdl->pParms[j].pHeight, pfHdl->pParms[j].pWidth);
                 }
             }
         }

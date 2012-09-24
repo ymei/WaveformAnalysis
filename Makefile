@@ -10,17 +10,20 @@ SHLIB_EXT      := .so
 LIBS           := -lm
 LDFLAGS        :=
 ############################# Library add-ons #################################
-INCLUDE += -I/opt/local/include
+TINYSCHEME_FEATURES := -DUSE_DL=1 -DUSE_MATH=1 -DUSE_ASCII_NAMES=0
+INCLUDE += -I/opt/local/include -I./tinyscheme/trunk
 LIBS    += -L/opt/local/lib -lpthread -lhdf5
 CFLAGS  += -DH5_NO_DEPRECATED_SYMBOLS
 GSLLIBS  = $(shell gsl-config --libs)
 LIBS    += $(GSLLIBS)
-LIBS    += -lfftw3
+LIBS    += -lfftw3 ./tinyscheme/trunk/libtinyscheme.a
 ############################# OS & ARCH specifics #############################
 ifneq ($(if $(filter Linux %BSD,$(OSTYPE)),OK), OK)
   ifeq ($(OSTYPE), Darwin)
+    CC = clang
     SHLIB_CFLAGS   := -dynamiclib
     SHLIB_EXT      := .dylib
+    TINYSCHEME_FEATURES += -DUSE_STRLWR=1 -D__APPLE__=1 -DOSX=1
     ifeq ($(shell sysctl -n hw.optional.x86_64), 1)
       ARCH           := x86_64
     endif
@@ -30,8 +33,11 @@ ifneq ($(if $(filter Linux %BSD,$(OSTYPE)),OK), OK)
     else
       # Let's assume this is win32
       SHLIB_EXT      := .dll
+      TINYSCHEME_FEATURES += -DUSE_STRLWR=0
     endif
   endif
+else
+  TINYSCHEME_FEATURES += -DSUN_DL=1
 endif
 
 ifneq ($(ARCH), x86_64)
@@ -44,7 +50,7 @@ ifeq ($(ARCH), ppc970)
 endif
 ############################ Define targets ###################################
 EXE_TARGETS = analyzeWaveform
-DEBUG_EXE_TARGETS = hdf5rawWaveformIo filters
+DEBUG_EXE_TARGETS = hdf5rawWaveformIo filters runScriptNGetConfig
 # SHLIB_TARGETS = XXX$(SHLIB_EXT)
 
 ifeq ($(ARCH), x86_64) # compile a 32bit version on 64bit platforms
@@ -67,6 +73,9 @@ filters: filters.c filters.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) -DFILTERS_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
 peakFinder.o: peakFinder.c peakFinder.h filters.h common.h
 runScriptNGetConfig.o: runScriptNGetConfig.c runScriptNGetConfig.h common.h
+	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -c $< -o $@
+runScriptNGetConfig: runScriptNGetConfig.c runScriptNGetConfig.h common.h
+	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -DRUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
 hdf5rawWaveformIo.o: hdf5rawWaveformIo.c hdf5rawWaveformIo.h common.h
 hdf5rawWaveformIo: hdf5rawWaveformIo.c hdf5rawWaveformIo.h
 	$(CC) $(CFLAGS) $(INCLUDE) -DHDF5RAWWAVEFORMIO_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@

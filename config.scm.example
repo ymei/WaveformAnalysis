@@ -1,0 +1,7 @@
+(set! wa-filter-respLen 17)
+(set! wa-filter-SavitzkyGolay-poly-order 2)
+(set! wa-filter-SavitzkyGolay-derivative-degree 1)
+(set! wa-peakFinder-hThreshold 0.5e-3)
+(set! wa-peakFinder-minSep 20.0)
+(set! wa-peakFinder-integralFraction 0.1)
+(set! wa-baseLine-nSamples 20)
