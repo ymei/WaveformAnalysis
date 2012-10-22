@@ -37,6 +37,7 @@ typedef struct config_parameters
 
 typedef struct peak_parameters
 {
+    ANALYSIS_WAVEFORM_BASE_TYPE pBaseline; /* `local' baseline for the pulse */
     ANALYSIS_WAVEFORM_BASE_TYPE pHeight; /* highest point */
     ANALYSIS_WAVEFORM_BASE_TYPE pStart; /* start on the filtered peak */
     ANALYSIS_WAVEFORM_BASE_TYPE pEnd; /* end on the filtered peak */

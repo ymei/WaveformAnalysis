@@ -50,11 +50,11 @@ filters_t *filters_init_for_convolution(size_t n, size_t np) /* for convolution 
     fHdl->fftWork1 = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
 
     fHdl->fftwPlan = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftWork, fHdl->fftWork,
-                                       FFTW_R2HC, FFTW_MEASURE);
+                                       FFTW_R2HC, FFTW_ESTIMATE);
     fHdl->fftwPlan1 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftWork1, fHdl->fftWork1,
-                                        FFTW_R2HC, FFTW_MEASURE);
+                                        FFTW_R2HC, FFTW_ESTIMATE);
     fHdl->fftwPlan2 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftWork, fHdl->fftWork,
-                                        FFTW_HC2R, FFTW_MEASURE);
+                                        FFTW_HC2R, FFTW_ESTIMATE);
 
     return fHdl;
 }

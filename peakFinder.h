@@ -23,6 +23,7 @@ ANALYSIS_WAVEFORM_BASE_TYPE peakfinder_baseline(peakfinder_t *pfHdl,
                                                 ANALYSIS_WAVEFORM_BASE_TYPE *inWav,
                                                 int inverse);
 size_t peakfinder_find(peakfinder_t *pfHdl);
+size_t peakfinder_find_with_zero_crossing(peakfinder_t *pfHdl);
 int peakfinder_close(peakfinder_t *pfHdl);
 
 #endif /* __PEAKFINDER_H__ */

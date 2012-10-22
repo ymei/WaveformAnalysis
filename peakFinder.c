@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <float.h>
 #include <math.h>
 #include "common.h"
 #include "peakFinder.h"
@@ -18,8 +19,10 @@ peakfinder_t *peakfinder_init(size_t wavLen, size_t nPeaksMax, config_parameters
 
     pfHdl->cParms = cParms;
     pfHdl->fHdl = filters_init_for_convolution(pfHdl->wavLen, cParms->filter_respLen);
-    filters_raisedCosine(pfHdl->fHdl);
-
+    // filters_raisedCosine(pfHdl->fHdl);
+    filters_SavitzkyGolay(pfHdl->fHdl,
+                          cParms->filter_SavitzkyGolay_poly_order,
+                          cParms->filter_SavitzkyGolay_derivative_degree);
     return pfHdl;
 }
 
@@ -162,6 +165,74 @@ size_t peakfinder_find(peakfinder_t *pfHdl)
                 max = pfHdl->fHdl->outWav[i];
                 p = i;
             }
+        }
+    }
+
+    return pfHdl->nPeaks;
+}
+
+size_t peakfinder_find_with_zero_crossing(peakfinder_t *pfHdl)
+{
+    ssize_t i, j, l, r, im, im1, tl, th, tm1, tm2;
+    int p=0, inPeak;
+    ANALYSIS_WAVEFORM_BASE_TYPE max, max1, bl, pH, rt, ft, fwhm;
+
+    size_t leadSkip=100;
+    
+    for(i=0; i<pfHdl->wavLen; i++)
+        pfHdl->fHdl->inWav[i] = pfHdl->blsWav[i];
+    filters_convolute(pfHdl->fHdl);
+
+    inPeak = 0;
+    pfHdl->nPeaks = 0;
+    for(i=leadSkip; i<pfHdl->wavLen; i++) {
+        if(inPeak == 0 && pfHdl->fHdl->outWav[i] >= pfHdl->cParms->peakFinder_hThreshold) {
+            /* possible beginning of a peak (upwards peak) */
+            max = pfHdl->cParms->peakFinder_hThreshold;
+            p = 0;
+            l = i;
+            inPeak = 1;
+        }
+        if(inPeak == 1 && pfHdl->fHdl->outWav[i] <= 0.0) {
+            /* zero-crossing */
+            r = l + 3*(i-l);
+            inPeak = 0;
+            max1 = -DBL_MAX;
+            for(j=l; j<=r; j++) {
+                if(pfHdl->fHdl->outWav[j] > max) {
+                    max = pfHdl->fHdl->outWav[j];
+                    im = j;
+                }
+                if(pfHdl->blsWav[j] > max1) {
+                    max1 = pfHdl->blsWav[j];
+                    im1 = j;
+                }
+            }
+            /* baseline */
+            bl = 0.0;
+            for(j=0; j < pfHdl->cParms->baseLine_nSamples; j++) {
+                bl += pfHdl->blsWav[l];
+            }
+            bl /= (ANALYSIS_WAVEFORM_BASE_TYPE)(pfHdl->cParms->baseLine_nSamples);
+            pH = max1 - bl;
+            /* rise and fall times, FWHM*/
+            tl = 0; th = 0; tm1 = 0;
+            for(j=im1; j>=l; j--) {
+                if(th == 0 && (pfHdl->blsWav[j] - bl < 0.9 * pH)) { th = j+1; }
+                if(tl == 0 && (pfHdl->blsWav[j] - bl < 0.1 * pH)) { tl = j; }
+                if(tm1 == 0 && (pfHdl->blsWav[j] - bl <= 0.5 * pH)) { tm1 = j; }
+            }
+            rt = th - tl;
+            tl = 0; th = 0; tm2 = 0;
+            for(j=im1; j<=r; j++) {
+                if(th == 0 && (pfHdl->blsWav[j] - bl < 0.9 * pH)) { th = j-1; }
+                if(tl == 0 && (pfHdl->blsWav[j] - bl < 0.1 * pH)) { tl = j; }
+                if(tm2 == 0 && (pfHdl->blsWav[j] - bl <= 0.5 * pH)) { tm2 = j; }
+            }
+            ft = tl - th;
+            fwhm = tm2 - tm1 + 1;
+
+            error_printf("%zd %g %g %g %g %g\n", im1, bl, pH, rt, ft, fwhm);
         }
     }
 
