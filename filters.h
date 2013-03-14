@@ -24,12 +24,13 @@ typedef struct filters_handle
 } filters_t;
 
 filters_t *filters_init(size_t n); /* input the waveform length.  The output is also of length n */
-filters_t *filters_init_for_convolution(size_t n, size_t np); /* for convolution */
+filters_t *filters_init_for_convolution(size_t n, size_t np); /* for convolution and fft */
 int filters_close(filters_t *fHdl);
 
 int filters_SavitzkyGolay(filters_t *fHdl, int m, int ld);
 int filters_raisedCosine(filters_t *fHdl);
 int filters_convolute(filters_t *fHdl);
+int filters_dofft(filters_t *fHdl);
 int filters_DWT(filters_t *fHdl); /* discrete wavelet transform */
 
 #endif // __FILTERS_H__

@@ -92,9 +92,16 @@ int main(int argc, char **argv)
     pfHdl = peakfinder_init(nPt, 10, cParms);
 
     for(i=0; i<nPt; i++) {
-        pfHdl->blsWav[i] = waveformBuf[i] - (-118865.0);
+        pfHdl->blsWav[i] = waveformBuf[i] - 100000; /* - (-118865.0); */
+        pfHdl->fHdl->inWav[i] = pfHdl->blsWav[i];
     }
-
+/*
+    filters_dofft(pfHdl->fHdl);
+    for(i=0; i<(pfHdl->fHdl->fftLen/2+1); i++) {
+        printf("%zd %g\n", i, pfHdl->fHdl->fftWork1[i]);
+    }
+*/
+// #if 0
     peakfinder_find_with_zero_crossing(pfHdl);
 
     iWaves2print = 0;
@@ -124,7 +131,7 @@ int main(int argc, char **argv)
                    pfHdl->pParms[j].pHeight, pfHdl->pParms[j].pWidth);
         }
     }
-
+//#endif
     free(waveformBuf);
     peakfinder_close(pfHdl);
     free_config_parameters(cParms);
