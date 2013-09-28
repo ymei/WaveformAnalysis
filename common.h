@@ -1,6 +1,8 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#define HDF5IO(name) hdf5rawWaveformIo_ ## name
+
 #define SCOPE_NCH 4
 #define SCOPE_MEM_LENGTH_MAX 12500000 /* DPO5054 default, 12.5M points maximum */
 
@@ -37,6 +39,7 @@ typedef struct config_parameters
 
 typedef struct peak_parameters
 {
+    ANALYSIS_WAVEFORM_BASE_TYPE pBaseline; /* `local' baseline for the pulse */
     ANALYSIS_WAVEFORM_BASE_TYPE pHeight; /* highest point */
     ANALYSIS_WAVEFORM_BASE_TYPE pStart; /* start on the filtered peak */
     ANALYSIS_WAVEFORM_BASE_TYPE pEnd; /* end on the filtered peak */
