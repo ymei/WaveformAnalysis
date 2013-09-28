@@ -78,7 +78,7 @@ runScriptNGetConfig: runScriptNGetConfig.c runScriptNGetConfig.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -DRUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
 hdf5rawWaveformIo.o: hdf5rawWaveformIo.c hdf5rawWaveformIo.h common.h
 hdf5rawWaveformIo: hdf5rawWaveformIo.c hdf5rawWaveformIo.h
-	$(CC) $(CFLAGS) $(INCLUDE) -DHDF5RAWWAVEFORMIO_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) -DHDF5IO_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
 
 # libmreadarray$(SHLIB_EXT): mreadarray.o
 # 	$(CC) $(SHLIB_CFLAGS) $(CFLAGS) $(LIBS) -o $@ $<
