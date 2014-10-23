@@ -3,7 +3,7 @@ ARCH   = $(shell uname -m)
 ##################################### Defaults ################################
 CC             := gcc
 INCLUDE        := -I.
-CFLAGS         := -Wall -std=c99 -pedantic -O3
+CFLAGS         := -Wall -Wno-overlength-strings -std=c99 -pedantic -O3
 CFLAGS_32      := -m32
 SHLIB_CFLAGS   := -fPIC -shared
 SHLIB_EXT      := .so
@@ -17,10 +17,13 @@ CFLAGS  += -DH5_NO_DEPRECATED_SYMBOLS
 GSLLIBS  = $(shell gsl-config --libs)
 LIBS    += $(GSLLIBS)
 LIBS    += -lfftw3 ./tinyscheme/trunk/libtinyscheme.a
+GLLIBS   =
 ############################# OS & ARCH specifics #############################
 ifneq ($(if $(filter Linux %BSD,$(OSTYPE)),OK), OK)
   ifeq ($(OSTYPE), Darwin)
-    CC = clang
+    CC      = clang
+    CFLAGS += -Wno-gnu-zero-variadic-macro-arguments
+    GLLIBS  = -framework GLUT -framework OpenGL -framework Cocoa
     SHLIB_CFLAGS   := -dynamiclib
     SHLIB_EXT      := .dylib
     TINYSCHEME_FEATURES += -DUSE_STRLWR=1 -D__APPLE__=1 -DOSX=1
@@ -38,6 +41,7 @@ ifneq ($(if $(filter Linux %BSD,$(OSTYPE)),OK), OK)
   endif
 else
   TINYSCHEME_FEATURES += -DSUN_DL=1
+  GLLIBS              += -lGL -lGLU -lglut
 endif
 
 ifneq ($(ARCH), x86_64)
@@ -49,7 +53,7 @@ ifeq ($(ARCH), ppc970)
   CFLAGS += -m64
 endif
 ############################ Define targets ###################################
-EXE_TARGETS = analyzeWaveform
+EXE_TARGETS = analyzeWaveform waveview
 DEBUG_EXE_TARGETS = hdf5rawWaveformIo filters runScriptNGetConfig
 # SHLIB_TARGETS = XXX$(SHLIB_EXT)
 
@@ -75,11 +79,16 @@ peakFinder.o: peakFinder.c peakFinder.h filters.h common.h
 runScriptNGetConfig.o: runScriptNGetConfig.c runScriptNGetConfig.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -c $< -o $@
 runScriptNGetConfig: runScriptNGetConfig.c runScriptNGetConfig.h common.h
-	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -DRUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -DRUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN $< $(LIBS) -lreadline $(LDFLAGS) -o $@
 hdf5rawWaveformIo.o: hdf5rawWaveformIo.c hdf5rawWaveformIo.h common.h
 hdf5rawWaveformIo: hdf5rawWaveformIo.c hdf5rawWaveformIo.h
 	$(CC) $(CFLAGS) $(INCLUDE) -DHDF5RAWWAVEFORMIO_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
-
+demux: demux.c hdf5rawWaveformIo.o
+	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@
+demuxdump: demuxdump.c hdf5rawWaveformIo.o
+	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@
+waveview: waveview.c hdf5rawWaveformIo.o
+	$(CC) $(CFLAGS) $(INCLUDE) -Wno-deprecated-declarations $^ $(LIBS) $(GLLIBS) $(LDFLAGS) -o $@
 # libmreadarray$(SHLIB_EXT): mreadarray.o
 # 	$(CC) $(SHLIB_CFLAGS) $(CFLAGS) $(LIBS) -o $@ $<
 # mreadarray.o: mreadarray.c

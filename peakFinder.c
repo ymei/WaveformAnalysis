@@ -17,7 +17,7 @@ peakfinder_t *peakfinder_init(size_t wavLen, size_t nPeaksMax, config_parameters
     pfHdl->nPeaks = 0;
 
     pfHdl->cParms = cParms;
-    pfHdl->fHdl = filters_init_for_convolution(pfHdl->wavLen, cParms->filter_respLen);
+    pfHdl->fHdl = filters_init_for_convolution(NULL, pfHdl->wavLen, cParms->filter_respLen);
     filters_raisedCosine(pfHdl->fHdl);
 
     return pfHdl;

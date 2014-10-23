@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <readline/readline.h>
+#include <readline/history.h>
+
 #include "scheme-private.h"
 #include "scheme.h"
 #include "common.h"
@@ -23,14 +26,14 @@ static scmvar_config_t scmvar_config_table[scmvar_config_table_n] = {
 };
 
 static inline char *strformat4ts(char *in)
-/* convert letters to lower case and replace _ with - */
+/* Convert letters to lower case and replace _ with - */
 {
     char *p;
     for (p=in ; *p ; ++p) { *p = tolower(*p); if(*p == '_') *p = '-';}
     return in;
 }
 
-scheme *tinyscheme_init(char *fName)
+scheme *tinyscheme_init(const char *fName)
 {
     FILE *fp=NULL;
     scheme *sc;
@@ -53,13 +56,15 @@ scheme *tinyscheme_init(char *fName)
     }
 
     for(i=0; i<scmvar_config_table_n; i++) {
+        /* String literals assigned in scmvar_config_table may be read-only on some systems,
+           so we dup them.  They are freed in _close() */
         scmvar_config_table[i].scmSymName = strformat4ts(strdup(scmvar_config_table[i].scmSymName));
         scmvar_config_table[i].symbol = sc->vptr->mk_symbol(sc, scmvar_config_table[i].scmSymName);
         switch (scmvar_config_table[i].scmVart) {
         case scmvart_integer:
             sc->vptr->scheme_define(sc, sc->global_env, scmvar_config_table[i].symbol,
                                     sc->vptr->mk_integer(sc, 0));
-            /* if want to make constant:   sc->vptr->setimmutable(symbol); */
+            /* If want to make constant:   sc->vptr->setimmutable(symbol); */
             break;
         case scmvart_real:
             sc->vptr->scheme_define(sc, sc->global_env, scmvar_config_table[i].symbol,
@@ -86,7 +91,7 @@ int tinyscheme_close(scheme *sc)
     return 0;
 }
 
-config_parameters_t *get_config_parameters(char *fName)
+config_parameters_t *get_config_parameters(const char *fName)
 {
     size_t i;
     scheme *sc;
@@ -130,10 +135,63 @@ int free_config_parameters(config_parameters_t *cParms)
 }
 
 #ifdef RUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN
+static char **oblist_names;
+void build_completion_list(scheme *sc)
+{
+    pointer scp;
+    size_t i, j, n=128;
+    if((oblist_names = calloc(n, sizeof(char*)))==NULL) {
+        error_printf("calloc oblist_names error.\n");
+        return;
+    }
+    
+    j = 0;
+    for(i=0; i<sc->vptr->vector_length(sc->oblist); i++) {
+        scp = sc->vptr->vector_elem(sc->oblist, i);
+        do {
+            oblist_names[j++] = sc->vptr->symname(sc->vptr->pair_car(scp));
+            if(j>=n) {
+                n *= 2;
+                if((oblist_names = realloc(oblist_names, n*sizeof(char*)))==NULL) {
+                    error_printf("realloc oblist_names error.\n");
+                    return;
+                }
+            }
+        } while((scp = sc->vptr->pair_cdr(scp)) != sc->NIL);
+    }
+    oblist_names[j] = NULL;
+}
+
+char *completion_entry_gen(const char *text, int state)
+{
+    static size_t list_index, len;
+    char *name;
+    if(!state) {
+        list_index = 0;
+        len = strlen(text);
+    }
+    while((name = oblist_names[list_index])) {
+        list_index++;
+        if(strncmp(name, text, len)==0)
+            return(strdup(name)); /* freed by rl automatically */
+    }
+    return((char*)NULL);
+}
+
+char **completion_func(const char *text, int start, int end)
+{
+    char **matches;
+    matches = (char**)NULL;
+    matches = rl_completion_matches(text, &completion_entry_gen);
+    return matches;
+}
+
 int main(int argc, char **argv)
 {
     scheme *sc;
     pointer rv;
+    size_t i, n;
+    char *input, prompt[1024], *output;
 
     sc = tinyscheme_init(NULL);
 
@@ -141,10 +199,55 @@ int main(int argc, char **argv)
     if(rv != sc->NIL) {
         printf("%ld\n", sc->vptr->ivalue(rv));
     }
+    output = (char*)calloc(1, 1024);
+    scheme_set_output_port_string(sc, output, output+1024);
+    /* Allow the output buffer to be re-allocated and freed by tinyscheme */
+    sc->outport->_object._port->kind |= port_srfi6;
 
-    scheme_load_named_file(sc,stdin,0);
+    rl_readline_name = "wa";
+    build_completion_list(sc);
+    rl_attempted_completion_function = completion_func;
+
+    /* Configure readline to auto-complete paths when the tab key is hit. */
+    rl_bind_key('\t', rl_complete);
+    for(i=0;;i++) {
+        /* Create prompt string from user name and current working directory. */
+        snprintf(prompt, sizeof(prompt), "wa %zd > ", i);
+        /* Display prompt and read input (n.b. input must be freed after use)... */
+        input = readline(prompt);
+        /* Check for EOF. */
+        if(!input) {
+            printf("\n");
+            break;
+        }
+        /* Add input to history. */
+        add_history(input);
+
+        /* Reset the state of, and clear, the output string */
+        sc->outport->_object._port->rep.string.curr = sc->outport->_object._port->rep.string.start;
+        bzero(sc->outport->_object._port->rep.string.start,
+              sc->outport->_object._port->rep.string.past_the_end
+              - sc->outport->_object._port->rep.string.start);
+        /* Evaluate the input */
+        scheme_load_string(sc, input);
+        /* Print the output */
+        n = strlen(sc->outport->_object._port->rep.string.start);
+        if(n) {
+            printf("%s", sc->outport->_object._port->rep.string.start);
+            if(*(sc->outport->_object._port->rep.string.start + n - 1) != '\n')
+                printf("\n");
+        }
+
+        free(input);
+    }
+
+    /* If not using readline */
+    /* scheme_load_named_file(sc,stdin,0); */
 
     tinyscheme_close(sc);
+    /* Output could have been re-allocated, so don't free it */
+    /* sc->outport->_object._port->rep.string.start seems to be freed by tinyscheme */
+    free(oblist_names);
     return EXIT_SUCCESS;
 }
 #endif

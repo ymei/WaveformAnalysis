@@ -15,7 +15,10 @@ typedef struct scmvar_config_elem
     pointer symbol;
 } scmvar_config_t;
 
-config_parameters_t *get_config_parameters(char *fName);
+scheme *tinyscheme_init(const char *fName);
+int tinyscheme_close(scheme *sc);
+/* init and close tinyscheme in a single run, and get the parameters as the result */
+config_parameters_t *get_config_parameters(const char *fName);
 int free_config_parameters(config_parameters_t *cParms);
 
 #endif /* __RUNSCRIPTNGETCONFIG_H__ */

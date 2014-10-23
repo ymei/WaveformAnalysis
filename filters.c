@@ -6,7 +6,7 @@
 #include "common.h"
 #include "filters.h"
 
-filters_t *filters_init(size_t n)
+filters_t *filters_init(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n)
 /* input the waveform length.  The output is also of length n.  n can
  * be odd in principle, but an even number is preferred */
 {
@@ -15,10 +15,17 @@ filters_t *filters_init(size_t n)
 
     fHdl->wavLen = n;
     fHdl->respLen = 0;
+    fHdl->malloced = 0;
     fHdl->fftUsed = 0;
+
+    if(inWav == NULL) {
+        fHdl->inWav = (ANALYSIS_WAVEFORM_BASE_TYPE*)
+            calloc(fHdl->wavLen, sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
+        fHdl->malloced = 1;
+    } else {
+        fHdl->inWav = inWav;
+    }
     
-    fHdl->inWav = (ANALYSIS_WAVEFORM_BASE_TYPE*)
-        calloc(fHdl->wavLen, sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
     fHdl->outWav = (ANALYSIS_WAVEFORM_BASE_TYPE*)
         calloc(fHdl->wavLen, sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
     fHdl->waveletWav = (WAVELET_BASE_TYPE*)
@@ -30,32 +37,39 @@ filters_t *filters_init(size_t n)
     return fHdl;
 }
 
-filters_t *filters_init_for_convolution(size_t n, size_t np) /* for convolution */
+filters_t *filters_init_for_convolution(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n, size_t np)
+/* for convolution */
 {
     filters_t *fHdl;
 
-    if(np % 2 == 0) {
+    if((np > 0) && (np % 2 == 0)) {
         error_printf("%s(): np = %zd is not odd!\n", __FUNCTION__, np);
         return NULL;
     }
 
-    fHdl = filters_init(n);
+    fHdl = filters_init(inWav, n);
     fHdl->respLen = np;
     fHdl->fftUsed = 1;
     fHdl->respWav = (ANALYSIS_WAVEFORM_BASE_TYPE*)
         calloc(fHdl->respLen, sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
+    if(np > 0) {
+        fHdl->fftLen = (fHdl->wavLen + fHdl->respLen+1); /* zero padding */
+        if(fHdl->fftLen % 2) fHdl->fftLen++; /* ensure fHdl->fftLen is even */
+    } else {
+        fHdl->fftLen = fHdl->wavLen; /* for spectrum calculation */
+    }
+
+    fHdl->fftwWork = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
+    fHdl->fftwWork1 = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
+    fHdl->fftwWin = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
+    filters_hanning_window(fHdl); /* Hanning window as the default */
+    fHdl->dt = 1.0;
     
-    fHdl->fftLen = (fHdl->wavLen + fHdl->respLen+1); /* zero padding */
-    if(fHdl->fftLen % 2) fHdl->fftLen++; /* ensure fHdl->fftLen is even */
-
-    fHdl->fftWork = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
-    fHdl->fftWork1 = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
-
-    fHdl->fftwPlan = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftWork, fHdl->fftWork,
+    fHdl->fftwPlan = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftwWork, fHdl->fftwWork,
                                        FFTW_R2HC, FFTW_MEASURE);
-    fHdl->fftwPlan1 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftWork1, fHdl->fftWork1,
+    fHdl->fftwPlan1 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftwWork1, fHdl->fftwWork1,
                                         FFTW_R2HC, FFTW_MEASURE);
-    fHdl->fftwPlan2 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftWork, fHdl->fftWork,
+    fHdl->fftwPlan2 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftwWork, fHdl->fftwWork,
                                         FFTW_HC2R, FFTW_MEASURE);
 
     return fHdl;
@@ -63,18 +77,21 @@ filters_t *filters_init_for_convolution(size_t n, size_t np) /* for convolution 
 
 int filters_close(filters_t *fHdl)
 {
+    if(fHdl->malloced) {
+        if(fHdl->inWav)
+            free(fHdl->inWav);
+    }
     if(fHdl->outWav)
         free(fHdl->outWav);
-    if(fHdl->inWav)
-        free(fHdl->inWav);
     if(fHdl->fftUsed) {
         if(fHdl->respWav)
             free(fHdl->respWav);
         FFTW(destroy_plan)(fHdl->fftwPlan);
         FFTW(destroy_plan)(fHdl->fftwPlan1);
         FFTW(destroy_plan)(fHdl->fftwPlan2);
-        FFTW(free)(fHdl->fftWork);
-        FFTW(free)(fHdl->fftWork1);
+        FFTW(free)(fHdl->fftwWork);
+        FFTW(free)(fHdl->fftwWork1);
+        FFTW(free)(fHdl->fftwWin);
     }
     gsl_wavelet_free(fHdl->gslDWT);
     gsl_wavelet_workspace_free(fHdl->gslDWTWork);
@@ -183,20 +200,20 @@ int filters_convolute(filters_t *fHdl)
     ANALYSIS_WAVEFORM_BASE_TYPE re, im;
     
     for(i=0; i<fHdl->wavLen; i++) {
-        fHdl->fftWork[i] = fHdl->inWav[i];
+        fHdl->fftwWork[i] = fHdl->inWav[i];
     }
     for(i=fHdl->wavLen; i<fHdl->fftLen; i++) {
-        fHdl->fftWork[i] = 0.0;
+        fHdl->fftwWork[i] = 0.0;
     }
 
     // fill in with respwav in wrap-around order
-    fHdl->fftWork1[0] = fHdl->respWav[0];
+    fHdl->fftwWork1[0] = fHdl->respWav[0];
     for(i=1; i<(fHdl->respLen+1)/2; i++) {
-        fHdl->fftWork1[i] = fHdl->respWav[i];
-        fHdl->fftWork1[fHdl->fftLen-i] = fHdl->respWav[fHdl->respLen-i];
+        fHdl->fftwWork1[i] = fHdl->respWav[i];
+        fHdl->fftwWork1[fHdl->fftLen-i] = fHdl->respWav[fHdl->respLen-i];
     }
     for(i=(fHdl->respLen+1)/2; i<(fHdl->fftLen-(fHdl->respLen+1)/2); i++) {
-        fHdl->fftWork1[i] = 0.0;
+        fHdl->fftwWork1[i] = 0.0;
     }
     
     // do fft
@@ -204,57 +221,66 @@ int filters_convolute(filters_t *fHdl)
     FFTW(execute)(fHdl->fftwPlan1);
 
     // multiply in complex fourier space, half-complex format
-    fHdl->fftWork[0] = fHdl->fftWork[0] * fHdl->fftWork1[0] 
+    fHdl->fftwWork[0] = fHdl->fftwWork[0] * fHdl->fftwWork1[0] 
         / (ANALYSIS_WAVEFORM_BASE_TYPE)fHdl->fftLen;
     for(i=1; i<fHdl->fftLen/2; i++) {
-        re = fHdl->fftWork[i] * fHdl->fftWork1[i]
-            - fHdl->fftWork[fHdl->fftLen-i] * fHdl->fftWork1[fHdl->fftLen-i];
-        im = fHdl->fftWork[i] * fHdl->fftWork1[fHdl->fftLen-i]
-            + fHdl->fftWork[fHdl->fftLen-i] * fHdl->fftWork1[i];
-        fHdl->fftWork[i] = re / (ANALYSIS_WAVEFORM_BASE_TYPE)fHdl->fftLen;
-        fHdl->fftWork[fHdl->fftLen-i] = im / (ANALYSIS_WAVEFORM_BASE_TYPE)fHdl->fftLen;
+        re = fHdl->fftwWork[i] * fHdl->fftwWork1[i]
+            - fHdl->fftwWork[fHdl->fftLen-i] * fHdl->fftwWork1[fHdl->fftLen-i];
+        im = fHdl->fftwWork[i] * fHdl->fftwWork1[fHdl->fftLen-i]
+            + fHdl->fftwWork[fHdl->fftLen-i] * fHdl->fftwWork1[i];
+        fHdl->fftwWork[i] = re / (ANALYSIS_WAVEFORM_BASE_TYPE)fHdl->fftLen;
+        fHdl->fftwWork[fHdl->fftLen-i] = im / (ANALYSIS_WAVEFORM_BASE_TYPE)fHdl->fftLen;
     }
-    fHdl->fftWork[fHdl->fftLen/2] = fHdl->fftWork[fHdl->fftLen/2] * fHdl->fftWork1[fHdl->fftLen/2]
+    fHdl->fftwWork[fHdl->fftLen/2] = fHdl->fftwWork[fHdl->fftLen/2] * fHdl->fftwWork1[fHdl->fftLen/2]
         / (ANALYSIS_WAVEFORM_BASE_TYPE)fHdl->fftLen;
 
     // ifft
     FFTW(execute)(fHdl->fftwPlan2);
 
     // copy the output to outwav
-    memcpy(fHdl->outWav, fHdl->fftWork, fHdl->wavLen * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
+    memcpy(fHdl->outWav, fHdl->fftwWork, fHdl->wavLen * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
     return 0;
 }
 
-int filters_dofft(filters_t *fHdl)
-/* compute fft and store the power spectrum into fftWork1, note that
- * the result is not normalized (not divided by fftLen).  This
- * function handles both odd and even number of input points.  The
- * resulting power spectrum has the length (fftLen / 2 + 1) regardless
- * of parity of fftLen */
+int filters_hanning_window(filters_t *fHdl)
 {
-    int oddQ;
+    size_t i;
+    
+    fHdl->fftwS1 = 0.0; fHdl->fftwS2 = 0.0;
+    for(i=0; i<fHdl->fftLen; i++) {
+        fHdl->fftwWin[i] = 0.5 * (1.0 - cos(2*M_PI*i/(double)fHdl->fftLen));
+        fHdl->fftwS1 += fHdl->fftwWin[i];
+        fHdl->fftwS2 += fHdl->fftwWin[i] * fHdl->fftwWin[i];
+    }
+
+    return 0;
+}
+
+int filters_fft_spectrum(filters_t *fHdl)
+/* compute fft and store the power spectrum into fftwWork(s), normalized.
+ * This function handles both odd and even number of input points.
+ * The resulting power spectrum has the length (int)((n+1)/2).
+ * Spectra density (linearized) is stored in fftwWork,
+ * Spectrum (linearized) is stored in fftwWork1.
+ */
+{
     size_t i;
 
-    for(i=0; i<fHdl->wavLen; i++) {
-        fHdl->fftWork[i] = fHdl->inWav[i];
+    for(i=0; i<fHdl->fftLen; i++) {
+        fHdl->fftwWork[i] = fHdl->inWav[i] * fHdl->fftwWin[i];
     }
-    for(i=fHdl->wavLen; i<fHdl->fftLen; i++) {
-        fHdl->fftWork[i] = 0.0;
-    }
-
     FFTW(execute)(fHdl->fftwPlan);
 
-    /* compute power spectrum into fftWork1 */
-    oddQ = fHdl->fftLen % 2;
-    fHdl->fftWork1[0] = fHdl->fftWork[0] * fHdl->fftWork[0];
-    for(i=1; i < (oddQ?(fHdl->fftLen>>1 + 1):(fHdl->fftLen>>1)); i++) {
-        fHdl->fftWork1[i] = fHdl->fftWork[i] * fHdl->fftWork[i]
-            + fHdl->fftWork[fHdl->fftLen - i] * fHdl->fftWork[fHdl->fftLen - i];
+    /* Compute linearized power spectrum into fftwWork1, in [V] for example, normalized.
+     * Total length should be (int)((n+1)/2) */
+    fHdl->fftwWork1[0] = fHdl->fftwWork[0] / fHdl->fftwS1;
+    for(i=1; i<(fHdl->fftLen+1)/2; i++) {
+        fHdl->fftwWork1[i] = hypot(fHdl->fftwWork[i],
+                                   fHdl->fftwWork[fHdl->fftLen - i]) * sqrt(2.0) / fHdl->fftwS1;
     }
-
-    if(!oddQ) { /* even number */
-        i = fHdl->fftLen >> 1;
-        fHdl->fftWork1[i] = fHdl->fftWork[i] * fHdl->fftWork[i];
+    /* For spectra density, normalization should be * sqrt(2.0 * dt / fftwS2) */
+    for(i=0; i<(fHdl->fftLen+1)/2; i++) {
+        fHdl->fftwWork[i] = fHdl->fftwWork1[i] * fHdl->fftwS1 * sqrt(fHdl->dt / fHdl->fftwS2);
     }
     return 0;
 }
@@ -269,7 +295,7 @@ int filters_DWT(filters_t *fHdl) /* discrete wavelet transform */
 #ifdef FILTERS_DEBUG_ENABLEMAIN
 int main(int argc, char **argv)
 {
-    #define PLEN 102
+    #define PLEN 1503
     ANALYSIS_WAVEFORM_BASE_TYPE pulse[PLEN] = {0.0};
     size_t i;
     filters_t *fHdl;
@@ -281,7 +307,19 @@ int main(int argc, char **argv)
     pulse[i--]=0.0; pulse[i--]=1.0; pulse[i--]=10.0; pulse[i--]=8.0; pulse[i--]=6.0;
     pulse[i--]=4.0; pulse[i--]=2.0; pulse[i--]=1.0; pulse[i--]=0.5; pulse[i--]=0.2;
 
-    fHdl = filters_init_for_convolution(PLEN, 31);
+    for(i=0; i<PLEN; i++) {
+        pulse[i] += 10.0 * cos(2.0 * M_PI/3.0 * i);
+    }
+    
+    fHdl = filters_init_for_convolution(pulse, PLEN, 0);
+    filters_fft_spectrum(fHdl);
+    for(i=0; i<fHdl->fftLen; i++) {
+        printf("%g %g\n", fHdl->fftwWork[i], fHdl->fftwWork1[i]);
+    }
+    printf("\n\n");
+    
+#if 0
+    fHdl = filters_init_for_convolution(NULL, PLEN, 31);
     memcpy(fHdl->inWav, pulse, PLEN * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
     
     filters_raisedCosine(fHdl);
@@ -289,7 +327,7 @@ int main(int argc, char **argv)
 
     for(i=0; i<fHdl->fftLen/*PLEN*/; i++) {
         // printf("%g %g\n", pulse[i], fHdl->outWav[i]);
-        printf("%g %g\n", fHdl->fftWork[i], fHdl->fftWork1[i]);
+        printf("%g %g\n", fHdl->fftwWork[i], fHdl->fftwWork1[i]);
     }
     printf("\n\n");
 
@@ -298,9 +336,9 @@ int main(int argc, char **argv)
 
     for(i=0; i<fHdl->fftLen/*PLEN*/; i++) {
         // printf("%g %g\n", pulse[i], fHdl->outWav[i]);
-        printf("%g %g\n", fHdl->fftWork[i], fHdl->fftWork1[i]);
+        printf("%g %g\n", fHdl->fftwWork[i], fHdl->fftwWork1[i]);
     }
-
+#endif
     filters_close(fHdl);
     return EXIT_SUCCESS;
 }

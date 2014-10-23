@@ -3,10 +3,12 @@
 
 #define HDF5IO(name) hdf5rawWaveformIo_ ## name
 
-#define SCOPE_NCH 4
+#define SCOPE_NCH 16
 #define SCOPE_MEM_LENGTH_MAX 12500000 /* DPO5054 default, 12.5M points maximum */
+#define SCOPE_DATA_TYPE int16_t
+#define SCOPE_DATA_HDF5_TYPE H5T_NATIVE_INT16
 
-#define RAW_WAVEFORM_BASE_TYPE char
+#define RAW_WAVEFORM_BASE_TYPE SCOPE_DATA_TYPE
 #define ANALYSIS_WAVEFORM_BASE_TYPE double
 #define FFT_BASE_TYPE double /* if this is float, FFTW should be fftwf_ */
 #define FFTW(name) fftw_ ## name
@@ -14,9 +16,9 @@
 
 struct waveform_attribute 
 {
-    unsigned int chMask;
-    size_t nPt; /* number of points in each event */
-    size_t nFrames; /* number of Fast Frames in each event, 0 means off */
+    uint32_t chMask;
+    uint64_t nPt; /* number of points in each event */
+    uint64_t nFrames; /* number of Fast Frames in each event, 0 means off */
     double dt;
     double t0;
     double ymult[SCOPE_NCH];
