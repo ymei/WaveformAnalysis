@@ -4,6 +4,9 @@
 #include <gsl/gsl_wavelet.h>
 #include "common.h"
 
+#define FFTW_NTHREADS_DEFAULT 4
+#define FFTW_FLAGS_DEFAULT FFTW_ESTIMATE
+
 typedef struct filters_handle 
 {
     /* public for i/o */
@@ -19,6 +22,8 @@ typedef struct filters_handle
     /* fft */
     int fftUsed;
     size_t fftLen;
+    size_t fftwNThreads;
+    unsigned fftwFlags;
     FFTW(plan) fftwPlan, fftwPlan1, fftwPlan2;
     FFT_BASE_TYPE *fftwWork, *fftwWork1;
     /* window function */

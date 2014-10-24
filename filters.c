@@ -1,4 +1,6 @@
 #include <string.h>
+#include <sys/types.h>
+#include <stdint.h>
 #include <math.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_wavelet.h>
@@ -17,6 +19,8 @@ filters_t *filters_init(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n)
     fHdl->respLen = 0;
     fHdl->malloced = 0;
     fHdl->fftUsed = 0;
+    fHdl->fftwNThreads = FFTW_NTHREADS_DEFAULT;
+    fHdl->fftwFlags = FFTW_FLAGS_DEFAULT;
 
     if(inWav == NULL) {
         fHdl->inWav = (ANALYSIS_WAVEFORM_BASE_TYPE*)
@@ -59,6 +63,13 @@ filters_t *filters_init_for_convolution(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size
         fHdl->fftLen = fHdl->wavLen; /* for spectrum calculation */
     }
 
+    if(fHdl->fftwNThreads > 0) {
+        if(FFTW(init_threads)() == 0) {
+            error_printf("fftw_init_threads error!\n");
+        }
+        FFTW(plan_with_nthreads)(fHdl->fftwNThreads);
+    }
+    
     fHdl->fftwWork = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
     fHdl->fftwWork1 = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
     fHdl->fftwWin = (FFT_BASE_TYPE*) FFTW(malloc)(sizeof(FFT_BASE_TYPE) * fHdl->fftLen);
@@ -66,11 +77,11 @@ filters_t *filters_init_for_convolution(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size
     fHdl->dt = 1.0;
     
     fHdl->fftwPlan = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftwWork, fHdl->fftwWork,
-                                       FFTW_R2HC, FFTW_MEASURE);
+                                       FFTW_R2HC, fHdl->fftwFlags);
     fHdl->fftwPlan1 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftwWork1, fHdl->fftwWork1,
-                                        FFTW_R2HC, FFTW_MEASURE);
+                                        FFTW_R2HC, fHdl->fftwFlags);
     fHdl->fftwPlan2 = FFTW(plan_r2r_1d)(fHdl->fftLen, fHdl->fftwWork, fHdl->fftwWork,
-                                        FFTW_HC2R, FFTW_MEASURE);
+                                        FFTW_HC2R, fHdl->fftwFlags);
 
     return fHdl;
 }
@@ -92,6 +103,10 @@ int filters_close(filters_t *fHdl)
         FFTW(free)(fHdl->fftwWork);
         FFTW(free)(fHdl->fftwWork1);
         FFTW(free)(fHdl->fftwWin);
+        if(fHdl->fftwNThreads > 0) {
+            FFTW(cleanup_threads)();
+            FFTW(cleanup)();
+        }
     }
     gsl_wavelet_free(fHdl->gslDWT);
     gsl_wavelet_workspace_free(fHdl->gslDWTWork);

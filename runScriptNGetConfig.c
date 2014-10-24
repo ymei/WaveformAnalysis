@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <ctype.h>
 #include <string.h>
 #include <readline/readline.h>
@@ -24,6 +25,8 @@ static scmvar_config_t scmvar_config_table[scmvar_config_table_n] = {
     {"wa-peakFinder_integralFraction", scmvart_real, NULL},
     {"wa-baseLine_nSamples", scmvart_integer, NULL}
 };
+/* list of object names in scheme, for rl completion */
+static char **oblist_names=NULL;
 
 static inline char *strformat4ts(char *in)
 /* Convert letters to lower case and replace _ with - */
@@ -134,9 +137,7 @@ int free_config_parameters(config_parameters_t *cParms)
     return 0;
 }
 
-#ifdef RUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN
-static char **oblist_names;
-void build_completion_list(scheme *sc)
+static void build_completion_list(scheme *sc)
 {
     pointer scp;
     size_t i, j, n=128;
@@ -162,7 +163,7 @@ void build_completion_list(scheme *sc)
     oblist_names[j] = NULL;
 }
 
-char *completion_entry_gen(const char *text, int state)
+static char *completion_entry_gen(const char *text, int state)
 {
     static size_t list_index, len;
     char *name;
@@ -178,7 +179,7 @@ char *completion_entry_gen(const char *text, int state)
     return((char*)NULL);
 }
 
-char **completion_func(const char *text, int start, int end)
+static char **completion_func(const char *text, int start, int end)
 {
     char **matches;
     matches = (char**)NULL;
@@ -186,19 +187,11 @@ char **completion_func(const char *text, int start, int end)
     return matches;
 }
 
-int main(int argc, char **argv)
+int tinyscheme_interactive(scheme *sc)
 {
-    scheme *sc;
-    pointer rv;
     size_t i, n;
     char *input, prompt[1024], *output;
 
-    sc = tinyscheme_init(NULL);
-
-    rv = scheme_eval(sc, sc->vptr->mk_symbol(sc, "wa-filter-resplen"));
-    if(rv != sc->NIL) {
-        printf("%ld\n", sc->vptr->ivalue(rv));
-    }
     output = (char*)calloc(1, 1024);
     scheme_set_output_port_string(sc, output, output+1024);
     /* Allow the output buffer to be re-allocated and freed by tinyscheme */
@@ -240,14 +233,30 @@ int main(int argc, char **argv)
 
         free(input);
     }
-
-    /* If not using readline */
-    /* scheme_load_named_file(sc,stdin,0); */
-
-    tinyscheme_close(sc);
     /* Output could have been re-allocated, so don't free it */
     /* sc->outport->_object._port->rep.string.start seems to be freed by tinyscheme */
     free(oblist_names);
+    return i;
+}
+
+#ifdef RUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN
+int main(int argc, char **argv)
+{
+    scheme *sc;
+    pointer rv;
+
+    sc = tinyscheme_init(NULL);
+
+    rv = scheme_eval(sc, sc->vptr->mk_symbol(sc, "wa-filter-resplen"));
+    if(rv != sc->NIL) {
+        printf("%ld\n", sc->vptr->ivalue(rv));
+    }
+
+    tinyscheme_interactive(sc);
+    /* If not using readline for interactive session */
+    /* scheme_load_named_file(sc,stdin,0); */
+
+    tinyscheme_close(sc);
     return EXIT_SUCCESS;
 }
 #endif

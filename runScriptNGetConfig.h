@@ -16,6 +16,7 @@ typedef struct scmvar_config_elem
 } scmvar_config_t;
 
 scheme *tinyscheme_init(const char *fName);
+int tinyscheme_interactive(scheme *sc);
 int tinyscheme_close(scheme *sc);
 /* init and close tinyscheme in a single run, and get the parameters as the result */
 config_parameters_t *get_config_parameters(const char *fName);

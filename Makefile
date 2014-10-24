@@ -16,7 +16,8 @@ LIBS    += -L/opt/local/lib -lpthread -lhdf5
 CFLAGS  += -DH5_NO_DEPRECATED_SYMBOLS
 GSLLIBS  = $(shell gsl-config --libs)
 LIBS    += $(GSLLIBS)
-LIBS    += -lfftw3 ./tinyscheme/trunk/libtinyscheme.a
+LIBS    += -lfftw3 -lfftw3_threads
+LIBS    += -lreadline ./tinyscheme/trunk/libtinyscheme.a
 GLLIBS   =
 ############################# OS & ARCH specifics #############################
 ifneq ($(if $(filter Linux %BSD,$(OSTYPE)),OK), OK)
@@ -79,7 +80,7 @@ peakFinder.o: peakFinder.c peakFinder.h filters.h common.h
 runScriptNGetConfig.o: runScriptNGetConfig.c runScriptNGetConfig.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -c $< -o $@
 runScriptNGetConfig: runScriptNGetConfig.c runScriptNGetConfig.h common.h
-	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -DRUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN $< $(LIBS) -lreadline $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -DRUNSCRIPTNGETCONFIG_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
 hdf5rawWaveformIo.o: hdf5rawWaveformIo.c hdf5rawWaveformIo.h common.h
 hdf5rawWaveformIo: hdf5rawWaveformIo.c hdf5rawWaveformIo.h
 	$(CC) $(CFLAGS) $(INCLUDE) -DHDF5RAWWAVEFORMIO_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
