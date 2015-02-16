@@ -55,7 +55,7 @@ ifeq ($(ARCH), ppc970)
 endif
 ############################ Define targets ###################################
 EXE_TARGETS = analyzeWaveform waveview
-DEBUG_EXE_TARGETS = hdf5rawWaveformIo filters runScriptNGetConfig
+DEBUG_EXE_TARGETS = hdf5rawWaveformIo utils filters runScriptNGetConfig
 # SHLIB_TARGETS = XXX$(SHLIB_EXT)
 
 ifeq ($(ARCH), x86_64) # compile a 32bit version on 64bit platforms
@@ -70,12 +70,15 @@ debug_exe_targets: $(DEBUG_EXE_TARGETS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
-analyzeWaveform: main.o filters.o peakFinder.o runScriptNGetConfig.o hdf5rawWaveformIo.o
+analyzeWaveform: main.o utils.o filters.o peakFinder.o runScriptNGetConfig.o hdf5rawWaveformIo.o
 	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@
 main.o: main.c hdf5rawWaveformIo.h common.h
+utils.o: utils.c utils.h common.h
+utils: utils.c utils.h common.h
+	$(CC) $(CFLAGS) $(INCLUDE) -DUTILS_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
 filters.o: filters.c filters.h common.h
-filters: filters.c filters.h common.h
-	$(CC) $(CFLAGS) $(INCLUDE) -DFILTERS_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
+filters: filters.c utils.o filters.h common.h
+	$(CC) $(CFLAGS) $(INCLUDE) -DFILTERS_DEBUG_ENABLEMAIN $< utils.o $(LIBS) $(LDFLAGS) -o $@
 peakFinder.o: peakFinder.c peakFinder.h filters.h common.h
 runScriptNGetConfig.o: runScriptNGetConfig.c runScriptNGetConfig.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -c $< -o $@

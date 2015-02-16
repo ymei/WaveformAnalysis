@@ -49,5 +49,6 @@ int filters_hanning_window(filters_t *fHdl);
 /* compute the spectrum in Fourier space, requires init_for_convolution with np = 0 */
 int filters_fft_spectrum(filters_t *fHdl);
 int filters_DWT(filters_t *fHdl); /* discrete wavelet transform */
+int filters_median(filters_t *fHdl, size_t n); /* median filter with moving window size n */
 
 #endif // __FILTERS_H__

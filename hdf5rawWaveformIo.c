@@ -110,7 +110,7 @@ int HDF5IO(write_waveform_attribute_in_file_header)(
     wavAttrTid = H5Tcreate(H5T_COMPOUND, sizeof(struct waveform_attribute));
 
     H5Tinsert(wavAttrTid, "wavAttr.chMask", HOFFSET(struct waveform_attribute, chMask),
-              H5T_NATIVE_UINT);
+              H5T_NATIVE_UINT32);
     H5Tinsert(wavAttrTid, "wavAttr.nPt", HOFFSET(struct waveform_attribute, nPt),
               SIZE_T_HDF5_TYPE);
     H5Tinsert(wavAttrTid, "wavAttr.nFrames", HOFFSET(struct waveform_attribute, nFrames),
@@ -158,7 +158,7 @@ int HDF5IO(read_waveform_attribute_in_file_header)(
     wavAttrTid = H5Tcreate(H5T_COMPOUND, sizeof(struct waveform_attribute));
 
     H5Tinsert(wavAttrTid, "wavAttr.chMask", HOFFSET(struct waveform_attribute, chMask),
-              H5T_NATIVE_UINT);
+              H5T_NATIVE_UINT32);
     H5Tinsert(wavAttrTid, "wavAttr.nPt", HOFFSET(struct waveform_attribute, nPt),
               SIZE_T_HDF5_TYPE);
     H5Tinsert(wavAttrTid, "wavAttr.nFrames", HOFFSET(struct waveform_attribute, nFrames),

@@ -6,6 +6,7 @@
 #include <gsl/gsl_wavelet.h>
 #include <fftw3.h>
 #include "common.h"
+#include "utils.h"
 #include "filters.h"
 
 filters_t *filters_init(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n)
@@ -307,6 +308,20 @@ int filters_DWT(filters_t *fHdl) /* discrete wavelet transform */
     return 0;
 }
 
+int filters_median(filters_t *fHdl, size_t n) /* median filter with moving window size n */
+{
+    size_t i, mid=n/2;
+
+    for(i=0; i<mid;i++) /* overhang at the beginning */
+        fHdl->outWav[i] = quickselect(fHdl->inWav, mid+i+1, (mid+i+1)/2);
+    for(i=0; i<fHdl->wavLen-1 - mid; i++)
+        fHdl->outWav[mid+i] = quickselect(fHdl->inWav + i, n, n/2);
+    for(i=0; i<mid; i++) /* overhang at the end */
+        fHdl->outWav[fHdl->wavLen-1 - i] = quickselect(fHdl->inWav + fHdl->wavLen - (mid-i+1),
+                                                       mid-i+1, (mid-i+1)/2);
+    return 0;
+}
+
 #ifdef FILTERS_DEBUG_ENABLEMAIN
 int main(int argc, char **argv)
 {
@@ -322,17 +337,25 @@ int main(int argc, char **argv)
     pulse[i--]=0.0; pulse[i--]=1.0; pulse[i--]=10.0; pulse[i--]=8.0; pulse[i--]=6.0;
     pulse[i--]=4.0; pulse[i--]=2.0; pulse[i--]=1.0; pulse[i--]=0.5; pulse[i--]=0.2;
 
+    fHdl = filters_init(pulse, PLEN);
+    filters_median(fHdl, 11);
+    for(i=0; i<fHdl->wavLen; i++) {
+        printf("%g %g\n", fHdl->inWav[i], fHdl->outWav[i]);
+    }
+    printf("\n\n");
+    
+#if 0
     for(i=0; i<PLEN; i++) {
         pulse[i] += 10.0 * cos(2.0 * M_PI/3.0 * i);
     }
-    
+
     fHdl = filters_init_for_convolution(pulse, PLEN, 0);
     filters_fft_spectrum(fHdl);
     for(i=0; i<fHdl->fftLen; i++) {
         printf("%g %g\n", fHdl->fftwWork[i], fHdl->fftwWork1[i]);
     }
     printf("\n\n");
-    
+#endif
 #if 0
     fHdl = filters_init_for_convolution(NULL, PLEN, 31);
     memcpy(fHdl->inWav, pulse, PLEN * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
@@ -354,6 +377,7 @@ int main(int argc, char **argv)
         printf("%g %g\n", fHdl->fftwWork[i], fHdl->fftwWork1[i]);
     }
 #endif
+
     filters_close(fHdl);
     return EXIT_SUCCESS;
 }
