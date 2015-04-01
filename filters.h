@@ -50,5 +50,6 @@ int filters_hanning_window(filters_t *fHdl);
 int filters_fft_spectrum(filters_t *fHdl);
 int filters_DWT(filters_t *fHdl); /* discrete wavelet transform */
 int filters_median(filters_t *fHdl, size_t n); /* median filter with moving window size n */
+int filters_trapezoidal(filters_t *fHdl, size_t k, size_t l, double M);
 
 #endif // __FILTERS_H__

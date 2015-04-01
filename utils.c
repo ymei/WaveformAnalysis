@@ -67,7 +67,7 @@ double rand_exp(double alpha)
     return -log(u)/alpha;
 }
 
-static size_t qs_partition(QS_TYPE *list, size_t left, size_t right, size_t pivotIndex)
+static inline size_t qs_partition(QS_TYPE *list, size_t left, size_t right, size_t pivotIndex)
 {
     QS_TYPE pivotValue, tmp;
     size_t i, storeIndex;
@@ -87,7 +87,7 @@ static size_t qs_partition(QS_TYPE *list, size_t left, size_t right, size_t pivo
     return storeIndex;
 }
 
-static QS_TYPE qs_select(QS_TYPE *list, size_t left, size_t right, size_t kth)
+static inline QS_TYPE qs_select(QS_TYPE *list, size_t left, size_t right, size_t kth)
 {
     size_t pivotIndex;
     if(left == right) return list[left];

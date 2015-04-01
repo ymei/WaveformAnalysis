@@ -21,7 +21,7 @@
 struct waveform_attribute 
 {
     uint32_t chMask;
-    uint64_t nPt; /* number of points in each event */
+    uint64_t nPt;     /* number of points in each event */
     uint64_t nFrames; /* number of Fast Frames in each event, 0 means off */
     double dt;
     double t0;
@@ -58,15 +58,22 @@ typedef struct peak_parameters
 #define bitsof(x) (8*sizeof(x))
 
 #ifdef DEBUG
-  #define debug_printf(fmt, ...) do { fprintf(stderr, fmt , ##__VA_ARGS__); fflush(stderr); \
+  #define debug_printf(fmt, ...) do { fprintf(stderr, fmt, ##__VA_ARGS__); fflush(stderr); \
                                     } while (0)
 #else
   #define debug_printf(...) ((void)0)
 #endif
-#define error_printf(fmt, ...) do { fprintf(stderr, fmt , ##__VA_ARGS__); fflush(stderr); \
+#define error_printf(fmt, ...) do { fprintf(stderr, fmt, ##__VA_ARGS__); fflush(stderr); \
                                   } while(0)
 
 #define MIN(x,y) (((x)>(y))?(y):(x))
 #define MAX(x,y) (((x)<(y))?(y):(x))
+
+#ifndef strlcpy
+#define strlcpy(a, b, c) do {                   \
+        strncpy(a, b, (c)-1);                   \
+        (a)[(c)-1] = '\0';                      \
+    } while (0)
+#endif
 
 #endif /* __COMMON_H__ */

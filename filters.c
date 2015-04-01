@@ -322,6 +322,38 @@ int filters_median(filters_t *fHdl, size_t n) /* median filter with moving windo
     return 0;
 }
 
+int filters_trapezoidal(filters_t *fHdl, size_t k, size_t l, double M)
+/* Trapezoidal filter as in Knoll NIMA 345(1994) 337-345.  k is the
+ * rise time, l is the delay of peak, l-k is the flat-top duration, M
+ * is the decay time constant (in number of samples) of the input
+ * pulse.  Set M=-1.0 to deal with a step-like input function.
+ */
+{
+    double s, pp;
+    ssize_t i, j, jk, jl, jkl;
+    double vj, vjk, vjl, vjkl, dkl;
+
+    s = 0.0; pp = 0.0;
+    
+    for(i=0; i<fHdl->wavLen; i++) {
+        j=i; jk = j-k; jl = j-l; jkl = j-k-l;
+        vj   = j>=0   ? fHdl->inWav[j]   : fHdl->inWav[0];
+        vjk  = jk>=0  ? fHdl->inWav[jk]  : fHdl->inWav[0];
+        vjl  = jl>=0  ? fHdl->inWav[jl]  : fHdl->inWav[0];
+        vjkl = jkl>=0 ? fHdl->inWav[jkl] : fHdl->inWav[0];
+
+        dkl = vj - vjk - vjl + vjkl;
+        pp = pp + dkl;
+        if(M>=0.0) {
+            s = s + pp + dkl * M;
+        } else { /* infinit decay time, so the input is a step function */
+            s = s + dkl;
+        }
+        fHdl->outWav[i] = s / (fabs(M) * (double)k);
+    }
+    return 0;
+}
+
 #ifdef FILTERS_DEBUG_ENABLEMAIN
 int main(int argc, char **argv)
 {
