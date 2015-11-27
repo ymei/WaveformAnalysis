@@ -2,12 +2,12 @@ OSTYPE = $(shell uname)
 ARCH   = $(shell uname -m)
 ##################################### Defaults ################################
 CC             := gcc
-INCLUDE        := -I.
+INCLUDE        := -I. -I/usr/local/include
 CFLAGS         := -Wall -Wno-overlength-strings -std=c99 -pedantic -O3
 CFLAGS_32      := -m32
 SHLIB_CFLAGS   := -fPIC -shared
 SHLIB_EXT      := .so
-LIBS           := -lm
+LIBS           := -L/opt/local/lib -lm
 LDFLAGS        :=
 ############################# Library add-ons #################################
 TINYSCHEME_FEATURES := -DUSE_DL=1 -DUSE_MATH=1 -DUSE_ASCII_NAMES=0
@@ -20,25 +20,27 @@ LIBS    += -lfftw3 -lfftw3_threads
 LIBS    += -lreadline ./tinyscheme/trunk/libtinyscheme.a
 GLLIBS   =
 ############################# OS & ARCH specifics #############################
-ifneq ($(if $(filter Linux %BSD,$(OSTYPE)),OK), OK)
+ifneq ($(OSTYPE), Linux)
   ifeq ($(OSTYPE), Darwin)
     CC      = clang
-    CFLAGS += -Wno-gnu-zero-variadic-macro-arguments
-    GLLIBS  = -framework GLUT -framework OpenGL -framework Cocoa
-    SHLIB_CFLAGS   := -dynamiclib
-    SHLIB_EXT      := .dylib
+    CFLAGS       += -Wno-gnu-zero-variadic-macro-arguments
+    GLLIBS       += -framework GLUT -framework OpenGL -framework Cocoa
+    SHLIB_CFLAGS := -dynamiclib
+    SHLIB_EXT    := .dylib
     TINYSCHEME_FEATURES += -DUSE_STRLWR=1 -D__APPLE__=1 -DOSX=1
     ifeq ($(shell sysctl -n hw.optional.x86_64), 1)
-      ARCH           := x86_64
+      ARCH       := x86_64
     endif
+  else ifeq ($(OSTYPE), FreeBSD)
+    CC      = clang
+	CFLAGS += -Wno-gnu-zero-variadic-macro-arguments
+    GLLIBS += -lGL -lGLU -lglut
+  else ifeq ($(OSTYPE), SunOS)
+      CFLAGS := -c -Wall -std=c99 -pedantic
   else
-    ifeq ($(OSTYPE), SunOS)
-      CFLAGS         := -c -Wall -std=c99 -pedantic
-    else
       # Let's assume this is win32
-      SHLIB_EXT      := .dll
+      SHLIB_EXT           := .dll
       TINYSCHEME_FEATURES += -DUSE_STRLWR=0
-    endif
   endif
 else
   TINYSCHEME_FEATURES += -DSUN_DL=1
