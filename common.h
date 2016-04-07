@@ -58,13 +58,13 @@ typedef struct peak_parameters
 #define bitsof(x) (8*sizeof(x))
 
 #ifdef DEBUG
-  #define debug_printf(fmt, ...) do { fprintf(stderr, fmt, ##__VA_ARGS__); fflush(stderr); \
-                                    } while (0)
+  #define debug_printf(...) do { fprintf(stderr, __VA_ARGS__); fflush(stderr); \
+                               } while (0)
 #else
   #define debug_printf(...) ((void)0)
 #endif
-#define error_printf(fmt, ...) do { fprintf(stderr, fmt, ##__VA_ARGS__); fflush(stderr); \
-                                  } while(0)
+#define error_printf(...) do { fprintf(stderr, __VA_ARGS__); fflush(stderr); \
+                             } while(0)
 
 #define MIN(x,y) (((x)>(y))?(y):(x))
 #define MAX(x,y) (((x)<(y))?(y):(x))

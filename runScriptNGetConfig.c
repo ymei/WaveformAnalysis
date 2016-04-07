@@ -40,7 +40,7 @@ scheme *tinyscheme_init(const char *fName)
 {
     FILE *fp=NULL;
     scheme *sc;
-    size_t i;
+    ssize_t i;
 
     /* init the interpreter */
     if ((sc = scheme_init_new()) == NULL) {
@@ -84,7 +84,7 @@ scheme *tinyscheme_init(const char *fName)
 
 int tinyscheme_close(scheme *sc)
 {
-    size_t i;
+    ssize_t i;
 
     scheme_deinit(sc);
     for(i=0; i<scmvar_config_table_n; i++) {
@@ -96,7 +96,7 @@ int tinyscheme_close(scheme *sc)
 
 config_parameters_t *get_config_parameters(const char *fName)
 {
-    size_t i;
+    ssize_t i;
     scheme *sc;
     pointer rv;
     long rv_i;
@@ -140,7 +140,8 @@ int free_config_parameters(config_parameters_t *cParms)
 static void build_completion_list(scheme *sc)
 {
     pointer scp;
-    size_t i, j, n=128;
+    ssize_t i, j;
+    size_t n=128;
     if((oblist_names = calloc(n, sizeof(char*)))==NULL) {
         error_printf("calloc oblist_names error.\n");
         return;
@@ -189,7 +190,8 @@ static char **completion_func(const char *text, int start, int end)
 
 int tinyscheme_interactive(scheme *sc)
 {
-    size_t i, n;
+    ssize_t i;
+    size_t n;
     char *input, prompt[1024], *output;
 
     output = (char*)calloc(1, 1024);
@@ -215,7 +217,13 @@ int tinyscheme_interactive(scheme *sc)
         }
         /* Add input to history. */
         add_history(input);
-
+        /* Wrap with (display ...) so the evaluated results are printed
+        n = strlen(input);
+        dinput = (char*)calloc(1, n+11);
+        strcpy(dinput, "(display ");
+        strcat(dinput, input);
+        dinput[n+9] = ')';
+        */
         /* Reset the state of, and clear, the output string */
         sc->outport->_object._port->rep.string.curr = sc->outport->_object._port->rep.string.start;
         bzero(sc->outport->_object._port->rep.string.start,
@@ -230,7 +238,7 @@ int tinyscheme_interactive(scheme *sc)
             if(*(sc->outport->_object._port->rep.string.start + n - 1) != '\n')
                 printf("\n");
         }
-
+        /* free(dinput); */
         free(input);
     }
     /* Output could have been re-allocated, so don't free it */

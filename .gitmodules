@@ -1,0 +1,3 @@
+[submodule "tinyscheme"]
+	path = tinyscheme
+	url = ./tinyscheme

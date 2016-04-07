@@ -33,7 +33,6 @@ ifneq ($(OSTYPE), Linux)
     endif
   else ifeq ($(OSTYPE), FreeBSD)
     CC      = clang
-	CFLAGS += -Wno-gnu-zero-variadic-macro-arguments
     GLLIBS += -lGL -lGLU -lglut
   else ifeq ($(OSTYPE), SunOS)
       CFLAGS := -c -Wall -std=c99 -pedantic
@@ -43,6 +42,7 @@ ifneq ($(OSTYPE), Linux)
       TINYSCHEME_FEATURES += -DUSE_STRLWR=0
   endif
 else
+  CFLAGS              += -D_GNU_SOURCE
   TINYSCHEME_FEATURES += -DSUN_DL=1
   GLLIBS              += -lGL -lGLU -lglut
 endif
@@ -82,6 +82,10 @@ filters.o: filters.c filters.h common.h
 filters: filters.c utils.o filters.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) -DFILTERS_DEBUG_ENABLEMAIN $< utils.o $(LIBS) $(LDFLAGS) -o $@
 peakFinder.o: peakFinder.c peakFinder.h filters.h common.h
+scmfpreg.o: scmfpreg.c scmfpreg.h common.h
+	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -c $< -o $@
+scmfpreg: scmfpreg.c scmfpreg.h common.h
+	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -DSCMFPREG_DEBUG_ENABLEMAIN $< $(LIBS) $(LDFLAGS) -o $@
 runScriptNGetConfig.o: runScriptNGetConfig.c runScriptNGetConfig.h common.h
 	$(CC) $(CFLAGS) $(INCLUDE) $(TINYSCHEME_FEATURES) -c $< -o $@
 runScriptNGetConfig: runScriptNGetConfig.c runScriptNGetConfig.h common.h
