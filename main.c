@@ -1,3 +1,11 @@
+/**
+ * \mainpage Waveform Analysis Utilities
+ *
+ * Including filters, peak finders etc.
+ *
+ *
+ * We use TinySCHEME as the embedded scripting language.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

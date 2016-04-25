@@ -1,3 +1,6 @@
+/** \file peakFinder.h
+ * Finding peaks in waveforms.
+ */
 #ifndef __PEAKFINDER_H__
 #define __PEAKFINDER_H__
 #include "common.h"

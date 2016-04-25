@@ -10,7 +10,6 @@
 static uint64_t rand_u, rand_v=4101842887655102017LL, rand_w=1LL;
 
 void rand_init(uint64_t j)
-/* j is the seed, e.g. 1237026722LL */
 {
     rand_v = 4101842887655102017LL;
     rand_w = 1LL;
@@ -31,14 +30,14 @@ uint64_t rand_int64()
     return (x + rand_v) ^ rand_w;
 }
 
+/** Uniform deviation between 0 and 1 */
 double rand0_1()
-/* Uniform deviation between 0 and 1 */
 {
     return 5.42101086242752217E-20 * rand_int64();
 }
 
+/** Gaussian (Normal) distribution */
 double rand_gauss()
-/* Gauss (Deviates) Distribution */
 {
     double v1, v2, R, fac;
     static double gset;
@@ -60,7 +59,6 @@ double rand_gauss()
 }
 
 double rand_exp(double alpha)
-/* Exponential Distribution */
 {
     double u;
     do { u = rand0_1();
@@ -104,7 +102,6 @@ static inline QS_TYPE qs_select(QS_TYPE *list, size_t left, size_t right, size_t
 }
 
 QS_TYPE quickselect(QS_TYPE *a, size_t n, size_t kth)
-/* Quickselect for finding median or kth smallest element, k starts from 0 */
 {
     QS_TYPE *list, v;
     list = (QS_TYPE*)malloc(sizeof(QS_TYPE) * n);

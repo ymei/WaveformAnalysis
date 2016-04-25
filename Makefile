@@ -64,7 +64,7 @@ ifeq ($(ARCH), x86_64) # compile a 32bit version on 64bit platforms
   # SHLIB_TARGETS += XXX_m32$(SHLIB_EXT)
 endif
 
-.PHONY: exe_targets shlib_targets debug_exe_targets clean
+.PHONY: exe_targets shlib_targets debug_exe_targets dox clean
 exe_targets: $(EXE_TARGETS)
 shlib_targets: $(SHLIB_TARGETS)
 debug_exe_targets: $(DEBUG_EXE_TARGETS)
@@ -108,6 +108,8 @@ waveview: waveview.c hdf5rawWaveformIo.o
 # libmreadarray_m32$(SHLIB_EXT): mreadarray.c
 # 	$(CC) -m32 $(SHLIB_CFLAGS) $(CFLAGS) $(CFLAGS_32) -o $@ $<
 
+dox:
+	doxygen
 clean:
 	rm -f *.o *.so *.dylib *.dll *.bundle
 	rm -f $(SHLIB_TARGETS) $(EXE_TARGETS) $(DEBUG_EXE_TARGETS)

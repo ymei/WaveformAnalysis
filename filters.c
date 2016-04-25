@@ -10,8 +10,6 @@
 #include "filters.h"
 
 filters_t *filters_init(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n)
-/* input the waveform length.  The output is also of length n.  n can
- * be odd in principle, but an even number is preferred */
 {
     filters_t *fHdl;
     fHdl = (filters_t*)malloc(sizeof(filters_t));
@@ -42,8 +40,8 @@ filters_t *filters_init(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n)
     return fHdl;
 }
 
-filters_t *filters_init_for_convolution(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n, size_t np)
 /* for convolution */
+filters_t *filters_init_for_convolution(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n, size_t np)
 {
     filters_t *fHdl;
 
@@ -193,7 +191,6 @@ int filters_SavitzkyGolay(filters_t *fHdl, int m, int ld)
 }
 
 int filters_raisedCosine(filters_t *fHdl)
-/* outermost bin, i=(fHdl->respLen-1)/2, is 0.0 */
 {
     ssize_t i;
     ANALYSIS_WAVEFORM_BASE_TYPE x;
@@ -273,12 +270,6 @@ int filters_hanning_window(filters_t *fHdl)
 }
 
 int filters_fft_spectrum(filters_t *fHdl)
-/* compute fft and store the power spectrum into fftwWork(s), normalized.
- * This function handles both odd and even number of input points.
- * The resulting power spectrum has the length (int)((n+1)/2).
- * Spectra density (linearized) is stored in fftwWork,
- * Spectrum (linearized) is stored in fftwWork1.
- */
 {
     size_t i;
 
@@ -323,11 +314,6 @@ int filters_median(filters_t *fHdl, size_t n) /* median filter with moving windo
 }
 
 int filters_trapezoidal(filters_t *fHdl, size_t k, size_t l, double M)
-/* Trapezoidal filter as in Knoll NIMA 345(1994) 337-345.  k is the
- * rise time, l is the delay of peak, l-k is the flat-top duration, M
- * is the decay time constant (in number of samples) of the input
- * pulse.  Set M=-1.0 to deal with a step-like input function.
- */
 {
     double s, pp;
     ssize_t i, j, jk, jl, jkl;
