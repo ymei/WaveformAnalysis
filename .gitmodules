@@ -1,3 +1,4 @@
 [submodule "tinyscheme"]
-	path = tinyscheme
-	url = ./tinyscheme
+    path = tinyscheme
+    url = ./tinyscheme
+    ignore = dirty

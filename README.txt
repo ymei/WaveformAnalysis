@@ -1,4 +1,6 @@
-Waveform Analysis Utilities
+/** \mainpage
+@brief Waveform Analysis Utilities
+\verbatim
 
 Including filters, peak finders etc.
 
@@ -10,3 +12,6 @@ every time TinySCHEME is updated.
 These are copied from NetScope
 hdf5rawWaveformIo.h
 hdf5rawWaveformIo.c
+
+\endverbatim
+*/

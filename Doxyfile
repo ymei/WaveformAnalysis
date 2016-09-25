@@ -1,5 +1,6 @@
 PROJECT_NAME           = "WaveformAnalysis"
 PROJECT_BRIEF          = "Waveform Analysis Utilities"
+INPUT                  = . README.txt
 OUTPUT_DIRECTORY       = ./dox
 FULL_PATH_NAMES        = NO
 JAVADOC_AUTOBRIEF      = YES
