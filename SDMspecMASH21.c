@@ -52,9 +52,9 @@ int main(int argc, char **argv)
 
     fhdl = filters_init_for_convolution(wav, np, 0);
     fhdl->dt = 1.0/25.6e6; /* fs = 25.6MHz, for automatic normalization */
-    df = 1.0/fhdl->dt / 2.0 / (double)((np+1)/2);
+    df = 1.0/fhdl->dt / (double)np;
     filters_fft_spectrum(fhdl);
-    printf("# %s %zd points fed into FFT, spectrum length is %zd\n", argv[1], np, (np+1)/2);
+    printf("# %s %zd points fed into FFT, spectrum length is %zd\n", argv[1], np, np/2+1);
     printf("# df = %g when fs = %g\n", df, 1.0/fhdl->dt);
     printf("# t, wav, f, Vrms/sqrt(Hz), Vrms\n");
 

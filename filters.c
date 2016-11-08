@@ -279,14 +279,17 @@ int filters_fft_spectrum(filters_t *fHdl)
     FFTW(execute)(fHdl->fftwPlan);
 
     /* Compute linearized power spectrum into fftwWork1, in [V] for example, normalized.
-     * Total length should be (int)((n+1)/2) */
+     * Total length should be (int)(n/2)+1 */
     fHdl->fftwWork1[0] = fHdl->fftwWork[0] / fHdl->fftwS1;
     for(i=1; i<(fHdl->fftLen+1)/2; i++) {
         fHdl->fftwWork1[i] = hypot(fHdl->fftwWork[i],
                                    fHdl->fftwWork[fHdl->fftLen - i]) * sqrt(2.0) / fHdl->fftwS1;
     }
+    if(fHdl->fftLen % 2 == 0) { /* even number */
+        fHdl->fftwWork1[fHdl->fftLen/2] = fHdl->fftwWork[fHdl->fftLen/2] / fHdl->fftwS1;
+    }
     /* For spectra density, normalization should be * sqrt(2.0 * dt / fftwS2) */
-    for(i=0; i<(fHdl->fftLen+1)/2; i++) {
+    for(i=0; i<=fHdl->fftLen/2; i++) {
         fHdl->fftwWork[i] = fHdl->fftwWork1[i] * fHdl->fftwS1 * sqrt(fHdl->dt / fHdl->fftwS2);
     }
     return 0;

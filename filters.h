@@ -69,7 +69,7 @@ int filters_hanning_window(filters_t *fHdl);
 /** Compute the spectrum in Fourier space.  Requires init_for_convolution with np = 0. 
  * Computed power spectrum is stored in fftwWork(s), normalized.
  * This function handles both odd and even number of input points.
- * The resulting power spectrum has the length (int)((n+1)/2).
+ * The resulting power spectrum has the length (int)(n/2)+1 for both even and odd n.
  * Spectra density (linearized) is stored in fftwWork,
  * Spectrum (linearized) is stored in fftwWork1.
  */
