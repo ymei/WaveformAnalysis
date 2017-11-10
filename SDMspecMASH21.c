@@ -8,8 +8,8 @@
 #include "filters.h"
 #include "mreadarray.h"
 
-double hth = 3.0; /**< threshold for high (logic 1) */
-double lth = 1.0; /**< threshold for low  (logic 0) */
+double hth = 0.8; /**< threshold for high (logic 1) */
+double lth = 0.2; /**< threshold for low  (logic 0) */
 
 /** Coefficients */
 double d0 = 1/16.0 / (1/6.0 * 0.5 * 0.5) - 1.0;
@@ -21,15 +21,19 @@ int main(int argc, char **argv)
     filters_t *fhdl;
     ANALYSIS_WAVEFORM_BASE_TYPE *wav;
     size_t np;
-    ssize_t i, j;
+    ssize_t i, j, k=0;
     double df;
+
+    if(argc>2) { /* select which columns in the file to compute */
+        k = atoll(argv[2]);
+    }
 
     mhdl = mrdary_init_f(argv[1], 65536);
     np = mrdary_read_all(mhdl);
     wav = (ANALYSIS_WAVEFORM_BASE_TYPE *)calloc(np, sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
 
     for(i=0; i<np; i++) {
-        for(j=0; j<2; j++) {
+        for(j=k*2; j<k*2+2; j++) {
             if(*mrdary_value_mn(mhdl, i, j) > hth) {
                 *mrdary_value_mn(mhdl, i, j) = 1.0;
             } else *mrdary_value_mn(mhdl, i, j) = -1.0;
@@ -37,13 +41,13 @@ int main(int argc, char **argv)
     }
     for(i=3; i<np; i++) {
         wav[i-3] =
-              *mrdary_value_mn(mhdl, i-1, 0)
-            + *mrdary_value_mn(mhdl, i-1, 0) * d0
-            - *mrdary_value_mn(mhdl, i-2, 0) * d0 * 2.0
-            + *mrdary_value_mn(mhdl, i-3, 0) * d0
-            + *mrdary_value_mn(mhdl, i,   1) * d1
-            - *mrdary_value_mn(mhdl, i-1, 1) * d1 * 2.0
-            + *mrdary_value_mn(mhdl, i-2, 1) * d1;
+              *mrdary_value_mn(mhdl, i-1, k*2)
+            + *mrdary_value_mn(mhdl, i-1, k*2)   * d0
+            - *mrdary_value_mn(mhdl, i-2, k*2)   * d0 * 2.0
+            + *mrdary_value_mn(mhdl, i-3, k*2)   * d0
+            + *mrdary_value_mn(mhdl, i,   k*2+1) * d1
+            - *mrdary_value_mn(mhdl, i-1, k*2+1) * d1 * 2.0
+            + *mrdary_value_mn(mhdl, i-2, k*2+1) * d1;
         // wav[i-3] = 1.0 * sin(5. * i);
     }
     mrdary_free(mhdl);
@@ -51,7 +55,7 @@ int main(int argc, char **argv)
     np -= 3;
 
     fhdl = filters_init_for_convolution(wav, np, 0);
-    fhdl->dt = 1.0/25.6e6; /* fs = 25.6MHz, for automatic normalization */
+    fhdl->dt = 1.0/25.0e6; /* fs = 25.0MHz, for automatic normalization */
     df = 1.0/fhdl->dt / (double)np;
     filters_fft_spectrum(fhdl);
     printf("# %s %zd points fed into FFT, spectrum length is %zd\n", argv[1], np, np/2+1);
@@ -64,7 +68,7 @@ int main(int argc, char **argv)
     }
 
     printf("\n\n");
-    
+
     filters_close(fhdl);
     return EXIT_SUCCESS;
 }
