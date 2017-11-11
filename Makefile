@@ -56,7 +56,7 @@ ifeq ($(ARCH), ppc970)
   CFLAGS += -m64
 endif
 ############################ Define targets ###################################
-EXE_TARGETS = analyzeWaveform waveview SDMspecMASH21
+EXE_TARGETS = analyzeWaveform waveview spectraFilter
 DEBUG_EXE_TARGETS = hdf5rawWaveformIo utils filters runScriptNGetConfig
 # SHLIB_TARGETS = XXX$(SHLIB_EXT)
 
@@ -72,7 +72,7 @@ debug_exe_targets: $(DEBUG_EXE_TARGETS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
-SDMspecMASH21: SDMspecMASH21.o filters.o mreadarray.o utils.o
+spectraFilter: spectraFilter.o filters.o mreadarray.o utils.o
 	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@
 analyzeWaveform: main.o utils.o filters.o peakFinder.o runScriptNGetConfig.o hdf5rawWaveformIo.o
 	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@

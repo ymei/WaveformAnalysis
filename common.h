@@ -29,7 +29,7 @@
  *
  * The analog value is computed as \f$(s-y_\text{off})\times y_\text{mult} + y_\text{zero}\f$.
  */
-struct waveform_attribute 
+struct waveform_attribute
 {
     uint32_t chMask;  /**< bitmap showing which device-original channel(s) are active */
     uint64_t nPt;     /**< number of points in each event */

@@ -19,7 +19,7 @@ peakfinder_t *peakfinder_init(size_t wavLen, size_t nPeaksMax, config_parameters
 
     pfHdl->cParms = cParms;
     pfHdl->fHdl = filters_init_for_convolution(NULL, pfHdl->wavLen, cParms->filter_respLen);
-    filters_raisedCosine(pfHdl->fHdl);
+    filters_raisedCosine(pfHdl->fHdl, 1, 0);
 
     return pfHdl;
 }
@@ -72,7 +72,7 @@ size_t peakfinder_find(peakfinder_t *pfHdl)
 
     for(i=0; i<pfHdl->wavLen; i++)
         pfHdl->fHdl->inWav[i] = pfHdl->blsWav[i];
-    filters_convolute(pfHdl->fHdl);
+    filters_convolute(pfHdl->fHdl, 0);
 
     /*
      * Allow a minimum seperation (minsep) between two peaks.  If two

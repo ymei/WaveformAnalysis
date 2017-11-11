@@ -20,7 +20,7 @@ int main(int argc, char **argv)
     size_t i, j, iCh, iEvent=0, nEvents=0, iFrame=0, frameSize, nEventsInFile;
     size_t nWaves2print=0, iWaves2print;
     char *configFileName, *inFileName;
-    
+
     struct hdf5rawWaveformIo_waveform_file *waveformFile;
     struct waveform_attribute waveformAttr;
     struct hdf5rawWaveformIo_waveform_event waveformEvent;
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
         frameSize = waveformAttr.nPt;
     }
 
-    waveformBuf = (RAW_WAVEFORM_BASE_TYPE*)malloc(waveformFile->nPt * waveformFile->nCh 
+    waveformBuf = (RAW_WAVEFORM_BASE_TYPE*)malloc(waveformFile->nPt * waveformFile->nCh
                                                   * sizeof(RAW_WAVEFORM_BASE_TYPE));
     waveformEvent.wavBuf = waveformBuf;
 
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
                 printf("# id %zd bl %g blSD %g nPeaks %zd", iWaves2print, pfHdl->baseLine,
                        pfHdl->baseLineSD, pfHdl->nPeaks);
                 for(j=0; j<pfHdl->nPeaks; j++) {
-                    printf(" (( %g %g %g )( %g %g %g))", pfHdl->pParms[j].pStart, 
+                    printf(" (( %g %g %g )( %g %g %g))", pfHdl->pParms[j].pStart,
                            pfHdl->pParms[j].pTime, pfHdl->pParms[j].pEnd,
                            pfHdl->pParms[j].pHeight, pfHdl->pParms[j].pWidth,
                            pfHdl->pParms[j].pIntegral);

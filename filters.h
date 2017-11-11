@@ -10,7 +10,7 @@
 #define FFTW_NTHREADS_DEFAULT 4
 #define FFTW_FLAGS_DEFAULT FFTW_ESTIMATE
 
-typedef struct filters_handle 
+typedef struct filters_handle
 {
     /* public for i/o */
     ANALYSIS_WAVEFORM_BASE_TYPE *inWav;
@@ -40,14 +40,12 @@ typedef struct filters_handle
 
 /** Initialize the filter.
  * @param[in] inWav waveform input.
- * If inWav == NULL, a space is malloced and freed upon closure. 
+ * If inWav == NULL, a space is malloced and freed upon closure.
  * If inWav is given, it is not freed.
- * @param[in] n waveform length.
- * The output is also of length n.  n can be odd in principle,
- * but an even number is preferred.
+ * @param[in] n waveform length.  The output is also of length n.
  */
 filters_t *filters_init(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size_t n);
-/** Initialize for convolution and fft
+/** Initialize for convolution and fft.
  * @param[in] np length of response function.  Must be an odd number.
  * np=0 is reserved for fft spectrum calculations.
  */
@@ -56,20 +54,33 @@ filters_t *filters_init_for_convolution(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size
 int filters_close(filters_t *fHdl);
 /** Savitzky-Golay filter.
  * @param[in] m order of polynomial.
- * @param[in] np number of points (response length)
- * @param[in] ld degree of derivative
+ * @param[in] np number of points (response length).
+ * @param[in] ld degree of derivative.
  */
 int filters_SavitzkyGolay(filters_t *fHdl, int m, int ld);
 /** Raised cosine as convolution kernel.
- * Outermost bin, i=(fHdl->respLen-1)/2, is set to 0.0
- **/
-int filters_raisedCosine(filters_t *fHdl);
-int filters_convolute(filters_t *fHdl);
-int filters_hanning_window(filters_t *fHdl);
-/** Compute the spectrum in Fourier space.  Requires init_for_convolution with np = 0. 
+ * Outermost bin, i=(fHdl->respLen-1)/2, is set to 0.0.
+ * @param[in] nf number of flat-top points including cos(0).  Must be an odd number.
+ * @param[in] norm mode of normalization.  0 : normalize such that the filtered waveform
+ *                                             will have the same mean value as the input.
+ *                                         1 : normalize for having the same RMS value.
+ */
+int filters_raisedCosine(filters_t *fHdl, int nf, int norm);
+/** Raised cosine as frequency domain response function.
+ * @param[in] nf number of flat-top points including cos(0).
+ * @param[in] np total number of points of cos(f) for f from 0 to pi inclusive.
+ */
+int filters_freqResp_raisedCosine(filters_t *fHdl, int nf, int np);
+/** Convolute with response then deconvolute to generate filtered signal.
+ * @param[in] freqResp 0 : convolute with time domain response,
+ *                     1 : convolute with frequency domain response.
+ */
+int filters_convolute(filters_t *fHdl, int freqResp);
+int filters_window_hann(filters_t *fHdl);
+/** Compute the spectrum in Fourier space.  Requires init_for_convolution with np = 0.
  * Computed power spectrum is stored in fftwWork(s), normalized.
  * This function handles both odd and even number of input points.
- * The resulting power spectrum has the length (int)(n/2)+1 for both even and odd n.
+ * The resulting power spectrum has the length (int)(n/2)+1.
  * Spectra density (linearized) is stored in fftwWork,
  * Spectrum (linearized) is stored in fftwWork1.
  */

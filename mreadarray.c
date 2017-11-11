@@ -66,7 +66,7 @@ mrdary_hdl *mrdary_init_f(const char *fname, size_t rowmax)
     hdl->marray = NULL;
     hdl->fp = fp;
 
-    /* read the first effective line 
+    /* read the first effective line
      * and determine the number of columns
      */
     hdl->column = 0;
@@ -83,7 +83,7 @@ mrdary_hdl *mrdary_init_f(const char *fname, size_t rowmax)
         }
         break;
     }
-    fprintf(stderr, "column: %zd\n", hdl->column);
+    // fprintf(stderr, "Number of columns in file: %zd\n", hdl->column);
     /* rewind the file */
     rewind(fp);
     hdl->row = 0;
@@ -106,14 +106,14 @@ size_t mrdary_read_all(mrdary_hdl *hdl)
     FILE *fp;
     double v;
     int i;
-    
+
     if(hdl->row != 0) {
         fprintf(stderr, "%s error: hdl->row = %zd != 0\n", __FUNCTION__, hdl->row);
         return 0;
     }
 
     fp = hdl->fp;
-    
+
     while(!feof(fp)) {
         if(fgets(buf, LINE_MAX, fp)==NULL)
             break;
