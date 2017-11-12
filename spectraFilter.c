@@ -19,22 +19,26 @@ typedef struct param
     double fs;   /**< sampling frequency */
     double hth;  /**< threshold for high (logic 1) */
     double lth;  /**< threshold for low  (logic 0) */
-    double roffs;/**< filter roll-off frequency start */
-    double roffe;/**< filter roll-off frequency end */
+    double roffs;/**< raised-cosine filter roll-off frequency start */
+    double roffe;/**< raised-cosine filter roll-off frequency end */
+    int flttype; /**< filter type */
+    int butorder;/**< butterworth filter order */
     int padding; /**< zero padding? */
     int sdm;     /**< operate on MASH21 SDM data? */
     ssize_t ch;  /**< select which channel in the file to compute, a channel occupies columns ch and (ch+1) */
 } param_t;
 
 param_t param_default = {
-    .fs      = 25.0e6,
-    .hth     = 0.8,
-    .lth     = 0.2,
-    .roffs   = 0.8e6,
-    .roffe   = 1.0e6,
-    .padding = 1,
-    .sdm     = 1,
-    .ch      = 0
+    .fs       = 25.0e6,
+    .hth      = 0.8,
+    .lth      = 0.2,
+    .roffs    = 0.8e6,
+    .roffe    = 1.0e6,
+    .flttype  = 0,
+    .butorder = 4,
+    .padding  = 1,
+    .sdm      = 1,
+    .ch       = 0
 };
 
 void print_usage(const param_t *pm)
@@ -43,8 +47,10 @@ void print_usage(const param_t *pm)
     printf("      -f sampling frequency [%g]\n", pm->fs);
     printf("      -h threshold for high (logic 1) [%g]\n", pm->hth);
     printf("      -l threshold for low  (logic 0) [%g]\n", pm->lth);
-    printf("      -s filter roll-off frequency start [%g]\n", pm->roffs);
-    printf("      -e filter roll-off frequency end   [%g]\n", pm->roffe);
+    printf("      -s raised-cosine filter roll-off frequency start or butterworth band low cutoff freq [%g]\n", pm->roffs);
+    printf("      -e raised-cosine filter roll-off frequency end or butterworth cutoff freq  [%g]\n", pm->roffe);
+    printf("      -t filter type. 0:raised-cosine, 1:butterworth low/high pass, 2:butterworth band [%d]\n", pm->flttype);
+    printf("      -b butterworth filter order, >0 for low/band pass, <0 for highpass/bandstop [%d]\n", pm->butorder);
     printf("      -p zero padding? [%d].  Spectrum is computed on filtered data\n", pm->padding);
     printf("         when padding is enabled.\n");
     printf("      -d operate on MASH21 SDM data? [%d].\n", pm->sdm);
@@ -64,7 +70,7 @@ int main(int argc, char **argv)
     char *inFileName;
 
     mrdary_hdl *mhdl;
-    filters_t *fhdl;
+    filters_t *fHdl;
     ANALYSIS_WAVEFORM_BASE_TYPE *wav;
     size_t np;
     ssize_t i, j, k=0;
@@ -72,8 +78,11 @@ int main(int argc, char **argv)
 
     memcpy(&pm, &param_default, sizeof(pm));
     /* parse switches */
-    while((optC = getopt(argc, argv, "c:d:e:f:h:l:p:s:")) != -1) {
+    while((optC = getopt(argc, argv, "b:c:d:e:f:h:l:p:s:t:")) != -1) {
         switch(optC) {
+        case 'b':
+            pm.butorder = strtol(optarg, NULL, 0);
+            break;
         case 'c':
             pm.ch = strtoll(optarg, NULL, 0);
             break;
@@ -97,6 +106,9 @@ int main(int argc, char **argv)
             break;
         case 's':
             pm.roffs = strtod(optarg, NULL);
+            break;
+        case 't':
+            pm.flttype = strtol(optarg, NULL, 0);
             break;
         default:
             print_usage(&pm);
@@ -148,33 +160,39 @@ int main(int argc, char **argv)
 
     j = (ssize_t)(pm.roffe / (pm.fs/(double)np)) | 1LL;
     if(pm.padding == 0) i = 0;
-    fhdl = filters_init_for_convolution(NULL, np, j);
-    // memcpy(fhdl->inWav, wav, fhdl->wavLen * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
+    fHdl = filters_init_for_convolution(NULL, np, j);
+    // memcpy(fHdl->inWav, wav, fHdl->wavLen * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
     /* make mean = 0 */
     mu = 0.0;
     for(i=0; i<np; i++) mu += wav[i];
     mu /= (double)np;
     for(i=0; i<np; i++) {
-        fhdl->inWav[i] = wav[i] - mu;
+        fHdl->inWav[i] = wav[i] - mu;
     }
-    fhdl->dt = 1.0/pm.fs; /* Sampling time interval, for automatic normalization. */
-    df = 1.0/fhdl->dt / (double)fhdl->fftLen;
-    filters_freqResp_raisedCosine(fhdl, pm.roffs/df, pm.roffe/df);
-    filters_convolute(fhdl, 1);
+    fHdl->dt = 1.0/pm.fs; /* Sampling time interval, for automatic normalization. */
+    df = 1.0/fHdl->dt / (double)fHdl->fftLen;
+    if(pm.flttype == 2) {
+        filters_iir_butterworth_band(fHdl, pm.butorder, pm.roffs/pm.fs, pm.roffe/pm.fs);
+    } else if(pm.flttype ==1) {
+        filters_iir_butterworth_lowhighpass(fHdl, pm.butorder, pm.roffe/pm.fs);
+    } else {
+        filters_freqResp_raisedCosine(fHdl, pm.roffs/df, pm.roffe/df);
+        filters_convolute(fHdl, 1);
+    }
     if(pm.padding) /* compute spectrum after filtering when padding is enabled. */
-        memcpy(fhdl->inWav, fhdl->outWav, fhdl->wavLen * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
-    filters_fft_spectrum(fhdl);
+        memcpy(fHdl->inWav, fHdl->outWav, fHdl->wavLen * sizeof(ANALYSIS_WAVEFORM_BASE_TYPE));
+    filters_fft_spectrum(fHdl);
     printf("# %s %zd points fed into FFT, spectrum length is %zd\n", inFileName, np, np/2+1);
-    printf("# df = %g when fs = %g\n", df, 1.0/fhdl->dt);
+    printf("# df = %g when fs = %g\n", df, 1.0/fHdl->dt);
     printf("# t, wav, filtered, f, Vrms/sqrt(Hz), Vrms\n");
 
     for(i=0; i<np; i++) {
-        printf("%g %24.16e %g %g %24.16e %24.16e\n", i * fhdl->dt, wav[i], fhdl->outWav[i]+mu,
-               i * df, fhdl->fftwWork[i], fhdl->fftwWork1[i]);
+        printf("%g %24.16e %g %g %24.16e %24.16e\n", i * fHdl->dt, wav[i], fHdl->outWav[i]+mu,
+               i * df, fHdl->fftwWork[i], fHdl->fftwWork1[i]);
     }
 
     printf("\n\n");
 
-    filters_close(fhdl);
+    filters_close(fHdl);
     return EXIT_SUCCESS;
 }

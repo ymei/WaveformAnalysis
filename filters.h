@@ -97,5 +97,19 @@ int filters_median(filters_t *fHdl, size_t n);
  * pulse.  Set M=-1.0 to deal with a step-like input function.
  */
 int filters_trapezoidal(filters_t *fHdl, size_t k, size_t l, double M);
+/** Butterworth lowpass or highpass filter implemented as time-domain IIR
+ * Reference: http://www.exstrom.com/journal/sigproc/
+ * @param[in] order order of the filter.  Should be an even number.  If odd, it is rounded down.
+ *                                        >0 for lowpass and <0 for highpass.
+ * @param[in] fc cutoff (-3dB or half-power) frequency as a fraction of sampling frequency.
+ */
+int filters_iir_butterworth_lowhighpass(filters_t *fHdl, int order, double fc);
+/** Butterworth bandpass or bandstop filter implemented as time-domain IIR
+ * Reference: http://www.exstrom.com/journal/sigproc/
+ * @param[in] order order of the filter.  Should be a multiple of 4.  >0 for bandpass and <0 for bandstop.
+ * @param[in] fl lower cutoff (-3dB or half-power) frequency as a fraction of sampling frequency.
+ * @param[in] fh upper cutoff (-3dB or half-power) frequency as a fraction of sampling frequency.
+ */
+int filters_iir_butterworth_band(filters_t *fHdl, int order, double fl, double fh);
 
 #endif // __FILTERS_H__

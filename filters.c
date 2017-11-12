@@ -406,6 +406,118 @@ int filters_trapezoidal(filters_t *fHdl, size_t k, size_t l, double M)
     return 0;
 }
 
+int filters_iir_butterworth_lowhighpass(filters_t *fHdl, int order, double fc)
+{
+    /* Reference: http://www.exstrom.com/journal/sigproc/ */
+    int lowpass;
+    ssize_t i, j;
+    double a, a2, r, s;
+
+    /* order should be an even number.  if odd, it is rounded down */
+    lowpass = (order>0);
+    order = abs(order) / 2;
+    a = tan(M_PI * fc);
+    a2 = a*a;
+
+    double *A  = (double *)malloc(order *sizeof(double));
+    double *d1 = (double *)malloc(order *sizeof(double));
+    double *d2 = (double *)malloc(order *sizeof(double));
+    double *w0 = (double *)calloc(order, sizeof(double));
+    double *w1 = (double *)calloc(order, sizeof(double));
+    double *w2 = (double *)calloc(order, sizeof(double));
+
+    for(i=0; i<order; i++) {
+        r = sin(M_PI*(2.0*i+1.0)/(4.0*order));
+        s = a2 + 2.0*a*r + 1.0;
+        if(lowpass) {
+            A[i] = a2/s;
+        } else {
+            A[i] = 1.0/s;
+        }
+        d1[i] = 2.0*(1-a2)/s;
+        d2[i] = -(a2 - 2.0*a*r + 1.0)/s;
+    }
+    if(lowpass) {a = 1.0;} else {a = -1.0;}
+    for(i=0; i<fHdl->wavLen; i++) {
+        s = fHdl->inWav[i];
+        for(j=0; j<order; j++) {
+            w0[j] = d1[j]*w1[j] + d2[j]*w2[j] + s;
+            s = A[j]*(w0[j] + a*2.0*w1[j] + w2[j]);
+            w2[j] = w1[j];
+            w1[j] = w0[j];
+        }
+        fHdl->outWav[i] = s;
+    }
+    free(A); free(d1); free(d2); free(w0); free(w1); free(w2);
+    return 0;
+}
+
+int filters_iir_butterworth_band(filters_t *fHdl, int order, double fl, double fh)
+{
+    if(order % 4 || fl >= fh) {
+        error_printf("%s(): improper arguments, order(=%d) must be 4, 8, 16... and fl(=%g)<fh(=%g).\n", __FUNCTION__, order, fl, fh);
+        return 1;
+    }
+    int pass;
+    ssize_t i, j;
+    double a, a2, b, b2, r, s;
+
+    pass = (order>0);
+    order = abs(order)/4;
+    a = cos(M_PI*(fh+fl)) / cos(M_PI*(fh-fl));
+    a2 = a * a;
+    b = tan(M_PI*(fh-fl));
+    b2 = b * b;
+
+    double *A  = (double *)malloc(order *sizeof(double));
+    double *d1 = (double *)malloc(order *sizeof(double));
+    double *d2 = (double *)malloc(order *sizeof(double));
+    double *d3 = (double *)malloc(order *sizeof(double));
+    double *d4 = (double *)malloc(order *sizeof(double));
+    double *w0 = (double *)calloc(order, sizeof(double));
+    double *w1 = (double *)calloc(order, sizeof(double));
+    double *w2 = (double *)calloc(order, sizeof(double));
+    double *w3 = (double *)calloc(order, sizeof(double));
+    double *w4 = (double *)calloc(order, sizeof(double));
+
+    for(i=0; i<order; i++) {
+        r = sin(M_PI*(2.0*i+1.0)/(4.0*order));
+        s = b2 + 2.0*b*r + 1.0;
+        if(pass) { /* bandpass */
+            A[i] = b2/s;
+        } else {   /* bandstop */
+            A[i] = 1.0/s;
+        }
+        d1[i] = 4.0*a*(1.0+b*r)/s;
+        d2[i] = 2.0*(b2-2.0*a2-1.0)/s;
+        d3[i] = 4.0*a*(1.0-b*r)/s;
+        d4[i] = -(b2 - 2.0*b*r + 1.0)/s;
+    }
+    if(pass == 0) { /* bandstop */
+        r = 4.0*a;
+        a = 4.0*a2+2.0;
+    }
+    for(i=0; i<fHdl->wavLen; i++) {
+        s = fHdl->inWav[i];
+        for(j=0; j<order; j++) {
+            w0[j] = d1[j]*w1[j] + d2[j]*w2[j]+ d3[j]*w3[j]+ d4[j]*w4[j] + s;
+            if(pass) {
+                s = A[j]*(w0[j] - 2.0*w2[j] + w4[j]);
+            } else {
+                s = A[j]*(w0[j] - r*w1[j] + a*w2[j]- r*w3[j] + w4[j]);
+            }
+            w4[j] = w3[j];
+            w3[j] = w2[j];
+            w2[j] = w1[j];
+            w1[j] = w0[j];
+        }
+        fHdl->outWav[i] = s;
+    }
+    free(A); free(d1); free(d2); free(d3); free(d4);
+    free(w0); free(w1); free(w2); free(w3); free(w4);
+    return 0;
+}
+
 #ifdef FILTERS_DEBUG_ENABLEMAIN
 int main(int argc, char **argv)
 {
