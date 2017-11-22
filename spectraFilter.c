@@ -17,6 +17,7 @@
 typedef struct param
 {
     double fs;   /**< sampling frequency */
+    double vref; /**< SDM reference voltage */
     double hth;  /**< threshold for high (logic 1) */
     double lth;  /**< threshold for low  (logic 0) */
     double roffs;/**< raised-cosine filter roll-off frequency start */
@@ -30,6 +31,7 @@ typedef struct param
 
 param_t param_default = {
     .fs       = 25.0e6,
+    .vref     = 2.0,
     .hth      = 0.8,
     .lth      = 0.2,
     .roffs    = 0.8e6,
@@ -45,6 +47,7 @@ void print_usage(const param_t *pm)
 {
     printf("Usage:\n");
     printf("      -f sampling frequency [%g]\n", pm->fs);
+    printf("      -r SDM reference voltage [%g]\n", pm->vref);
     printf("      -h threshold for high (logic 1) [%g]\n", pm->hth);
     printf("      -l threshold for low  (logic 0) [%g]\n", pm->lth);
     printf("      -s raised-cosine filter roll-off frequency start or butterworth band low cutoff freq [%g]\n", pm->roffs);
@@ -78,7 +81,7 @@ int main(int argc, char **argv)
 
     memcpy(&pm, &param_default, sizeof(pm));
     /* parse switches */
-    while((optC = getopt(argc, argv, "b:c:d:e:f:h:l:p:s:t:")) != -1) {
+    while((optC = getopt(argc, argv, "b:c:d:e:f:h:l:p:r:s:t:")) != -1) {
         switch(optC) {
         case 'b':
             pm.butorder = strtol(optarg, NULL, 0);
@@ -103,6 +106,9 @@ int main(int argc, char **argv)
             break;
         case 'p':
             pm.padding = strtol(optarg, NULL, 0);
+            break;
+        case 'r':
+            pm.vref = strtod(optarg, NULL);
             break;
         case 's':
             pm.roffs = strtod(optarg, NULL);
@@ -134,13 +140,13 @@ int main(int argc, char **argv)
         for(i=0; i<np; i++) {
             for(j=k*2; j<k*2+2; j++) {
                 if(*mrdary_value_mn(mhdl, i, j) > pm.hth) {
-                    *mrdary_value_mn(mhdl, i, j) = 1.0;
-                } else *mrdary_value_mn(mhdl, i, j) = -1.0;
+                    *mrdary_value_mn(mhdl, i, j)    =  pm.vref;
+                } else *mrdary_value_mn(mhdl, i, j) = -pm.vref;
             }
         }
         for(i=3; i<np; i++) {
             wav[i-3] =
-                *mrdary_value_mn(mhdl, i-1, k*2)
+                  *mrdary_value_mn(mhdl, i-1, k*2)
                 + *mrdary_value_mn(mhdl, i-1, k*2)   * d0
                 - *mrdary_value_mn(mhdl, i-2, k*2)   * d0 * 2.0
                 + *mrdary_value_mn(mhdl, i-3, k*2)   * d0
