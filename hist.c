@@ -14,8 +14,9 @@
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
  * 3. Users of source code or binary forms are encouraged to take the
- * challenge of adopting a vegetarian diet for a full day chosen at their
- * convenience as a token of gratitude to the authors.
+ * challenge of adopting a vegetarian diet (but eggs and dairy products
+ * are permissible) for a full day chosen at their convenience as a token
+ * of appreciation.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -31,14 +32,15 @@
  */
 /*
  * Inspired by the syntax of the TTree::Draw expression in CERN ROOT.
+ * For example
  *
- * hist 'sin($1+$2^(log(if($3 > 0.1, $3, 0.1)))):$2::1/exp($5)>>h(100, -1.0, 1.0, 50, 0.0, 2.0)' data.dat
- *            X-axis expr                         Y    W           nx  xmin  xmax ny  ymin ymax
+ * hist 'sin($1+$2^(log(if($3>1,$3,1)))):$2::exp(-$5)>>h(100, -1.0, 1.0, 50, 0.0, 2.0)' data.dat
+ *            X-axis expr                 Y    W          nx  xmin xmax  ny ymin ymax
  *
- * will generate a 2D histogram according to the x,y,z binning
- * specification using data from the file, transformed by the X,Y,Z
- * and W (weight) expression, then filled into the histogram with
- * weight.  Weight is assumed to be 1 if ::W is absent.  1, 2 and 3
+ * will generate a 2D histogram according to the x and y binning
+ * specifications using the data from the file.  The values of x, y, and
+ * histogram weight are evaluated from the above X, Y, and W expressions,
+ * respectively.  The weight is assumed to be 1 if ::W is absent.  1, 2 and 3
  * dimensional histograms are supported.  The generated histogram data
  * are printed to stdout and are suitable for plotting in gnuplot:
  *
@@ -49,59 +51,94 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <limits.h>
+#include <time.h>
 
-/** Parameters settable from commandline */
+struct token_s;
+
+/** Parameters settable from commandline and some global states */
 typedef struct param
 {
   int normalize;       /**< normalize histogram instead of raw counts */
   int bincenter;       /**< print bin center instead of lower edge */
   const char *command; /**< histogram command string */
   const char *dfname;  /**< input data file name */
+  /* to be filled by the parser from the input command */
+  int dim;
+  char *sx, *sy, *sz, *sw, *sh, *sxyz;
+  int xn, yn, zn, colmax;
+  double xmin, xmax, dx;
+  double ymin, ymax, dy;
+  double zmin, zmax, dz;
+  struct token_s *px, *py, *pz, *pw;
 } param_t;
 
 /** set default parameters, C89 compatible */
-static void param_set_default(param_t *p)
+static void param_set_default(param_t *pm)
 {
-  p->normalize = 0;
-  p->bincenter = 0;
-  p->command = "sin(-$1+$2):cos($3)>>h(100, -1.0, 1.0, -23, -1.1, 1.2)";
-  p->dfname = "data.dat";
+  pm->normalize = 0;
+  pm->bincenter = 0;
+  pm->command = "sin(-$1+$2):cos($3)>>h(100, -1.0, 1.0, -23, -1.1, 1.2)";
+  pm->dfname = "data.dat";
+  pm->dim = 1;
+  pm->colmax = 0;
+  pm->sx = pm->sy = pm->sz = pm->sw = pm->sh = pm->sxyz = NULL;
+  pm->px = pm->py = pm->pz = pm->pw = NULL;
+}
+
+/** free memory */
+static void param_free(param_t *pm)
+{
+  free(pm->sxyz);
+  free(pm->px); free(pm->py); free(pm->pz); free(pm->pw);
 }
 
 static void print_usage(const param_t *pm)
 {
-  printf("Usage:\n");
-  printf("    hist -c -m 0 'exprX:exprY:exprZ::exprW>>h(nx,xl,xh,ny...)' dfname\n");
-  printf("         -c print bin center, default is bin lower edge, currently %s.\n", (pm->bincenter ? "on" : "off"));
-  printf("         -m 0:counts, 1:normalize to sum=1.0, 2:integral=1.0, currently %d.\n", pm->normalize);
-  printf("         exprX,Y,Z : expressions for computing X,Y,Z values\n");
-  printf("                     use $1 to address the leftmost data column in file.\n");
-  printf("         exprW expression for weight, if omitted, weight=1.\n");
-  printf("         Up to 3-dimensional histograms are supported.\n");
+  fprintf(stderr, "Usage:\n");
+  fprintf(stderr, "    hist -c -m 0 'exprX:exprY:exprZ::exprW>>h(nx,xl,xh,ny...)' dfname\n");
+  fprintf(stderr, "         -c print bin center, default is bin lower edge, currently %s.\n", (pm->bincenter ? "on" : "off"));
+  fprintf(stderr, "         -m normalization, 0: raw counts, 1: make the sum=1.0, 2: make the integral=1.0, currently %d.\n", pm->normalize);
+  fprintf(stderr, "         exprX,Y,Z : expressions for computing X,Y,Z values\n");
+  fprintf(stderr, "                     use $1 to address the leftmost data column in file.\n");
+  fprintf(stderr, "         exprW expression for weight, if omitted, weight=1.\n");
+  fprintf(stderr, "         Up to 3-dimensional histograms are supported.\n");
 }
 
 static int param_parse(param_t *pm, int argc, char **argv)
 {
-  int i, iarg = 0;
+  int i, ich, iarg = 0;
   const char *p;
 
   param_set_default(pm);
   /* parse switches */
   for ( i = 1; i < argc; i++ ) {
     if ( argv[i][0] == '-' && strstr(argv[i], ">>") == NULL ) {
-      switch ( argv[i][1] ) {
-      case 'c':
-        pm->bincenter = 1;
-        break;
-      case 'm':
-        p = argv[i] + 2; /* string next to '-m' */
-        if ( *p == '\0' && i < argc - 1 ) p = argv[i+1];
-        pm->normalize = (int) strtol(p, NULL, 0);
-        break;
-      default:
-        print_usage(pm);
-        return EXIT_FAILURE;
-        break;
+      /* going over characters in this options, s.t. "-cm" <==> "-c -m" */
+      for ( ich = 1; ich > 0 && argv[i][ich] != '\0'; ich++ ) {
+        switch ( argv[i][ich] ) {
+        case 'c':
+          pm->bincenter = 1;
+          break;
+        case 'm':
+          p = argv[i] + ich + 1; /* string next to '-m' */
+          if ( *p == '\0' && i < argc - 1 && isdigit(*argv[i+1]) ) {
+            ich = -1; /* skip the remaining of this argument */
+            p = argv[++i];
+          }
+          if ( isdigit(*p) ) {
+            char *q;
+            pm->normalize = (int) strtol(p, &q, 0);
+            if ( ich >= 0 ) ich = q - argv[i] - 1;
+          } else {
+            pm->normalize++; /* such that "-mm" means "-m2" */
+          }
+          break;
+        default:
+          fprintf(stderr, "Error: unknown option [%c] in argument %d [%s]\n", argv[i][ich], i, argv[i]);
+          print_usage(pm);
+          return EXIT_FAILURE;
+        }
       }
     } else {
       if ( iarg == 0 ) {
@@ -112,10 +149,19 @@ static int param_parse(param_t *pm, int argc, char **argv)
       iarg++;
     }
   }
-  if ( iarg < 2 ) {
+
+  if ( iarg < 2
+       || ( pm->normalize < 0 || pm->normalize > 2 ) ) {
     print_usage(pm);
     return EXIT_FAILURE;
   }
+#ifdef DEBUG
+  fprintf(stderr, "Input file:    %s\n"
+          "Command:       %s\n"
+          "Bin-center:    %s\n"
+          "Normalization: %d\n",
+          pm->dfname, pm->command, (pm->bincenter ? "on" : "off"), pm->normalize);
+#endif
   return EXIT_SUCCESS;
 }
 
@@ -129,7 +175,7 @@ const char *ops = ",+-*/%^_<>!=&|()";
 
 #define VARNAME_MAX 128
 
-typedef struct {
+typedef struct token_s {
   int type;
   char s[VARNAME_MAX]; /**< operator/function name */
   double val;
@@ -310,7 +356,7 @@ static token_t *hist_expr_parse2postfix(const char *s)
     } else if ( tok->type == OPERATOR ) {
       if ( (tok->s[0] == '+' || tok->s[0] == '-') &&
            ( tok[1].type == NULLTYPE || tok[1].type == FUNCTION
-          || (tok[1].type == OPERATOR && tok[1].s[0] != ')') ) ) {
+             || (tok[1].type == OPERATOR && tok[1].s[0] != ')') ) ) {
         /* handle a unary operator */
         if ( tok->s[0] == '-' ) {
           tok->s[0] = '_'; /* change it to negation */
@@ -333,7 +379,7 @@ static token_t *hist_expr_parse2postfix(const char *s)
     { /* debug routine to print out the output queue and operator stack */
       token_t *t;
       char buf[VARNAME_MAX];
-      fprintf(stderr, "%s\nQueue: ", hist_expr_token2str(buf, tok));
+      fprintf(stderr, "String: %s; Token: %s\nQueue: ", s, hist_expr_token2str(buf, tok));
       for ( t = que; t->type != NULLTYPE; t++ )
         fprintf(stderr, "%s ", hist_expr_token2str(buf, t));
       fprintf(stderr, "\nStack: ");
@@ -355,8 +401,36 @@ static token_t *hist_expr_parse2postfix(const char *s)
   return que;
 }
 
-static double max(double a, double b) { return (a > b) ? a : b; }
-static double min(double a, double b) { return (a < b) ? a : b; }
+/* Tausworthe random number generator */
+static double rand01(void)
+{
+  static unsigned long s1, s2, s3;
+
+#if ( ULONG_MAX > 4294967295 )  /*  64 bit version */
+#define MASK 0xffffffffUL
+#define TAUSWORTHE(s, a, b, c, d) (((s & c) << d) & MASK) ^ ((((s << a) & MASK) ^ s) >> b)
+#else /* 32 bit version */
+#define TAUSWORTHE(s, a, b, c, d) (((s & c) << d) ^ (((s << a) ^ s) >> b) )
+#endif
+#define TAUS3() s1 = TAUSWORTHE(s1, 13, 19, 4294967294UL, 12); \
+                s2 = TAUSWORTHE(s2,  2, 25, 4294967288UL,  4); \
+                s3 = TAUSWORTHE(s3,  3, 11, 4294967280UL, 17)
+
+  if ( s1 == 0 ) {
+    s3 = (unsigned long) clock() & 0xffffffffUL;
+    s1 = ( 1664525 * s3 + 1013904223 ) & 0xffffffffUL;
+    s2 = ( 1664525 * s1 + 1013904223 ) & 0xffffffffUL;
+    s3 = ( 1664525 * s2 + 1013904223 ) & 0xffffffffUL;
+    TAUS3(); TAUS3(); TAUS3(); TAUS3(); TAUS3(); TAUS3();
+  }
+  TAUS3();
+  return ( s1 ^ s2 ^ s3 ) / 4294967296.0;
+#undef TAUSWORTHE
+#undef TAUS3
+}
+
+static double dblmax(double a, double b) { return ( a > b ) ? a : b; }
+static double dblmin(double a, double b) { return ( a < b ) ? a : b; }
 static double iif(double c, double a, double b) { return ( c != 0 ) ? a : b; }
 
 typedef struct {
@@ -371,6 +445,9 @@ typedef struct {
 } varmap_t;
 
 static funcmap_t funcmap[] = {
+  {"rand", rand01, 0},
+  {"rand01", rand01, 0},
+  {"rand0_1", rand01, 0},
   {"fabs", fabs, 1},
   {"abs", fabs, 1},
   {"sqrt", sqrt, 1},
@@ -392,8 +469,8 @@ static funcmap_t funcmap[] = {
   {"ceil", ceil, 1},
   {"floor", floor, 1},
   {"fmod", fmod, 2},
-  {"min", min, 2},
-  {"max", max, 2},
+  {"min", dblmin, 2},
+  {"max", dblmax, 2},
   {"if", iif, 3},
   {"iif", iif, 3},
   {"", NULL, 0}
@@ -434,7 +511,7 @@ static double hist_expr_eval_postfix(const token_t *que, const double *arr, int 
     if ( pos->type == NUMBER ) {
       st[top++] = pos->val;
     } else if ( pos->type == COLUMN ) {
-      st[top++] = ( pos->col <= narr ) ? arr[pos->col - 1] : 0.0; /* array index off-by-one */
+      st[top++] = ( pos->col <= narr ) ? arr[pos->col] : 0.0;
     } else if ( pos->type == VARIABLE ) {
       for ( i = 0; varmap[i].s[0] != '\0'; i++ ) {
         if ( strcmp(varmap[i].s, pos->s) == 0 ) {
@@ -446,7 +523,7 @@ static double hist_expr_eval_postfix(const token_t *que, const double *arr, int 
       if ( strchr("_!", pos->s[0]) != NULL && pos->s[1] == '\0' ) { /* unary operators */
         if ( top < 1 ) {
           fprintf(stderr, "Error: insufficient arguments for operator [%s]\n",
-              pos->s);
+                  pos->s);
           exit(1);
         }
         if ( pos->s[0] == '_' ) {
@@ -459,7 +536,7 @@ static double hist_expr_eval_postfix(const token_t *que, const double *arr, int 
       } else { /* binary operators */
         if ( top < 2 ) {
           fprintf(stderr, "Error: insufficient arguments for operator [%s], has %d\n",
-              pos->s, top);
+                  pos->s, top);
           exit(1);
         }
         --top;
@@ -501,10 +578,12 @@ static double hist_expr_eval_postfix(const token_t *que, const double *arr, int 
         if ( strcmp(funcmap[i].s, pos->s) == 0 ) {
           if ( top < funcmap[i].narg ) {
             fprintf(stderr, "Error: insufficient arguments for function [%s], has %d, require %d\n",
-                funcmap[i].s, top, funcmap[i].narg);
+                    funcmap[i].s, top, funcmap[i].narg);
             exit(1);
           }
-          if ( funcmap[i].narg == 1 ) {
+          if ( funcmap[i].narg == 0 ) {
+            st[top++] = (*funcmap[i].f)();
+          } else if ( funcmap[i].narg == 1 ) {
             st[top-1] = (*funcmap[i].f)(st[top-1]);
           } else if ( funcmap[i].narg == 2 ) {
             --top;
@@ -517,7 +596,7 @@ static double hist_expr_eval_postfix(const token_t *que, const double *arr, int 
         }
       }
     }
-#ifdef DEBUG
+#if (defined(DEBUG) && (DEBUG >= 2))
     { /* print out the evaluation stack */
       int j;
       char s[VARNAME_MAX];
@@ -576,165 +655,194 @@ static char *file_read_long_line(char **s, size_t *n, FILE *fp)
   return *s;
 }
 
-static int hist_from_file(const char *command, const char *dfname, const param_t *pm)
+/** parse the histogram command to components */
+static int hist_parse_command(param_t *pm, FILE *fplog)
 {
-  token_t *px, *py = NULL, *pz = NULL, *pw = NULL;
-  char *sx, *sy = NULL, *sz = NULL, *sw = NULL;
-  char *sxyz, *shist = NULL, *p;
-  int dim = 1, i, n, col, colmax = 0, ix, iy, iz, xn, yn, zn, hn;
-  double x, xmin, xmax, dx;
-  double y, ymin, ymax, dy;
-  double z, zmin, zmax, dz;
-  double w, wtot = 0, norm, *hist = NULL;
-  FILE *fp;
-  double *data = NULL;
-  size_t bufsz = 0;
-  char *buf = NULL;
+  char *p, *q;
+  double harr[9];
+  int i, np, n, noxyz = 0, hdim = 0;
   const char *delims = " \t\r\n,;";
 
   /* make a copy of the command */
-  n = strlen(command);
-  if ( (sxyz = calloc(n + 1, 1)) == NULL ) exit(-1);
-  strcpy(sxyz, command);
+  n = strlen(pm->command);
+  if ( (pm->sxyz = calloc(n + 1, 1)) == NULL ) exit(-1);
+  strcpy(pm->sxyz, pm->command);
 
   /* get the histogram string */
-  if ( (p = strstr(sxyz, ">>")) != NULL ) {
+  if ( (p = strstr(pm->sxyz, ">>")) != NULL ) {
     *p = '\0';
-    shist = p + 2;
+    pm->sh = p + 2;
+  } else if ( (p = strstr(pm->sxyz, "h(")) != NULL ) {
+    noxyz = 1;
+    pm->sh = p;
   } else {
-    fprintf(stderr, "Error: no \'>>\' in [%s]\n", command);
-    return -1;
+    fprintf(stderr, "Error: no \'>>\' in [%s]\n", pm->command);
+    return EXIT_FAILURE;
   }
 
-  /* get the weight expression */
-  if ( (p = strstr(sxyz, "::")) != NULL ) {
-    *p = '\0';
-    sw = p + 2;
-    pw = hist_expr_parse2postfix(sw);
-    if ( (i = hist_expr_get_colmax(pw)) > colmax ) colmax = i;
-  } else {
-    fprintf(stderr, "Note: no \'::\' for weight in [%s], assuming 1.0\n", sxyz);
+  /* get histogram parameters */
+  if ( (p = strchr(pm->sh, '(')) == NULL ) {
+    fprintf(stderr, "Error: no ( for the histogram string %s\n", pm->sh);
+    return EXIT_FAILURE;
+  }
+  /* remove the terminal ")" */
+  if ( (q = strrchr(pm->sh, ')')) != NULL ) *q = '\0';
+  /* split the arguments of h(...) into an array */
+  p = strtok(p + 1, delims);
+  for ( np = 0; np < 9; ) {
+    token_t *t = hist_expr_parse2postfix(p);
+    harr[np++] = hist_expr_eval_postfix(t, NULL, 0);
+    free(t);
+    if ( (p = strtok(NULL, delims)) == NULL ) break;
+  }
+  hdim = np / 3; /* dimension suggested by the h() function */
+  /* assign the parameters of each dimension */
+  if ( np >= 3 ) {
+    pm->xn = (int) (harr[0] + 0.5);
+    pm->xmin = harr[1];
+    pm->xmax = harr[2];
+    pm->dx = ( pm->xmax - pm->xmin ) / pm->xn;
+    pm->zn = pm->yn = pm->xn;
+    pm->zmin = pm->ymin = pm->xmin;
+    pm->zmax = pm->ymax = pm->xmax;
+    pm->dz = pm->dy = pm->dx;
+  }
+  if ( np >= 6 ) {
+    pm->yn = (int) (harr[3] + 0.5);
+    pm->ymin = harr[4];
+    pm->ymax = harr[5];
+    pm->dy = ( pm->ymax - pm->ymin ) / pm->yn;
+    pm->zn = pm->yn;
+    pm->zmin = pm->ymin;
+    pm->zmax = pm->ymax;
+    pm->dz = pm->dy;
+  }
+  if ( np >= 9 ) {
+    pm->zn = (int) (harr[6] + 0.5);
+    pm->zmin = harr[7];
+    pm->zmax = harr[8];
   }
 
-  /* get the x expression */
-  sx = sxyz;
-  /* get the y expression */
-  if ( (p = strchr(sx, ':')) != NULL ) {
-    dim++;
-    *p = '\0';
-    sy = p + 1;
-    /* get the z expression */
-    if ( (p = strchr(sy, ':')) != NULL ) {
-      dim++;
+  if ( noxyz ) { /* default: plot the first column */
+    pm->dim = ( hdim > 1 ) ? hdim : 1;
+    pm->colmax = pm->dim;
+    pm->sx = "$1";
+    pm->sy = "$2";
+    pm->sz = "$3";
+    pm->sw = NULL;
+  } else {
+    /* get the weight expression */
+    if ( (p = strstr(pm->sxyz, "::")) != NULL ) {
       *p = '\0';
-      sz = p + 1;
+      pm->sw = p + 2;
+    } else {
+#ifdef DEBUG
+      fprintf(stderr, "Note: no \'::\' for weight in [%s], assuming 1.0\n", pm->sxyz);
+#endif
+    }
+
+    /* get the x expression */
+    pm->dim = 1;
+    pm->sx = pm->sxyz;
+    /* get the y expression */
+    if ( (p = strchr(pm->sx, ':')) != NULL ) {
+      pm->dim++;
+      *p = '\0';
+      pm->sy = p + 1;
+      /* get the z expression */
+      if ( (p = strchr(pm->sy, ':')) != NULL ) {
+        pm->dim++;
+        *p = '\0';
+        pm->sz = p + 1;
+      }
     }
   }
 
   /* get the postfix expressions for x, y, z */
-  px = hist_expr_parse2postfix(sx);
-  if ( (i = hist_expr_get_colmax(px)) > colmax ) colmax = i;
-  if ( dim >= 2 ) {
-    py = hist_expr_parse2postfix(sy);
-    if ( (i = hist_expr_get_colmax(py)) > colmax ) colmax = i;
-    if ( dim >= 3 ) {
-      pz = hist_expr_parse2postfix(sz);
-      if ( (i = hist_expr_get_colmax(pz)) > colmax ) colmax = i;
+  pm->colmax = 0;
+  if ( pm->sw ) {
+    pm->pw = hist_expr_parse2postfix(pm->sw);
+    if ( (i = hist_expr_get_colmax(pm->pw)) > pm->colmax ) pm->colmax = i;
+  }
+  pm->px = hist_expr_parse2postfix(pm->sx);
+  if ( (i = hist_expr_get_colmax(pm->px)) > pm->colmax ) pm->colmax = i;
+  if ( pm->dim >= 2 ) {
+    pm->py = hist_expr_parse2postfix(pm->sy);
+    if ( (i = hist_expr_get_colmax(pm->py)) > pm->colmax ) pm->colmax = i;
+    if ( pm->dim >= 3 ) {
+      pm->pz = hist_expr_parse2postfix(pm->sz);
+      if ( (i = hist_expr_get_colmax(pm->pz)) > pm->colmax ) pm->colmax = i;
     }
   }
+
+  if ( fplog != NULL ) {
+    if ( pm->dim == 1 ) {
+      fprintf(fplog, "# hist1D: x: %s ; weight: %s ; xbins (%d, %g, %g)\n",
+              pm->sx, (pm->sw ? pm->sw : "1"), pm->xn, pm->xmin, pm->xmax);
+    } else if ( pm->dim == 2 ) {
+      fprintf(fplog, "# hist2D: x: %s ; y: %s ; weight: %s ; xbins (%d, %g, %g) ; ybins (%d, %g, %g)\n",
+              pm->sx, pm->sy, (pm->sw ? pm->sw : "1"), pm->xn, pm->xmin, pm->xmax, pm->yn, pm->ymin, pm->ymax);
+    } else if ( pm->dim == 3 ) {
+      fprintf(fplog, "# hist3D: x: %s ; y: %s ; z: %s ; weight: %s ; xbins (%d, %g, %g) ; ybins (%d, %g, %g) ; zbins (%d, %g, %g)\n",
+              pm->sx, pm->sy, pm->sz, (pm->sw ? pm->sw : "1"), pm->xn, pm->xmin, pm->xmax,
+              pm->yn, pm->ymin, pm->ymax, pm->zn, pm->zmin, pm->zmax);
+    }
+  }
+
+  return EXIT_SUCCESS;
+}
+
+static int hist_from_file(param_t *pm)
+{
+  int i, col, ix, iy, iz, hn;
+  double x, y, z, w, wtot = 0, norm, *hist = NULL;
+  FILE *fp;
+  double *data = NULL;
+  size_t bufsz = 0, lineid = 0;
+  char *buf = NULL, *p;
+  const char *delims = " \t\r\n,;";
 
   /* allocate the data array */
-  if ( (data = calloc(colmax + 1, sizeof(*data))) == NULL ) exit(-1);
+  if ( (data = calloc(pm->colmax + 2, sizeof(*data))) == NULL ) exit(-1);
 
-  /* get histogram parameters */
-  if (3 != sscanf(shist, " h ( %d, %lf, %lf%n", &xn, &xmin, &xmax, &i)) {
-    fprintf(stderr, "Error: invalid histogram x-axis specification [%s]\n", p);
-    goto END;
-  }
-  p = shist + i;
-  dx = (xmax - xmin) / xn;
-  zn = yn = xn;
-  zmin = ymin = xmin;
-  zmax = ymax = xmax;
-  dz = dy = dx;
-
-  if ( dim >= 2 ) { /* scan histogram y parameters */
-    while ( *p && isspace(*p) ) p++;
-    if ( *p != ')' ) {
-      p++; /* skip a , or ; */
-      if (3 != sscanf(p, "%d, %lf, %lf%n", &yn, &ymin, &ymax, &i)) {
-        fprintf(stderr, "Error: invalid histogram y-axis specification [%s]\n", p);
-        goto END;
-      }
-      p += i;
-      dy = (ymax - ymin) / yn;
-      zn = yn;
-      zmin = ymin;
-      zmax = ymax;
-      dz = dy;
-      if ( dim >= 3 ) { /* scan histogram z parameters */
-        while ( *p && isspace(*p) ) p++;
-        if ( *p != ')' ) {
-          p++; /* skip a , or ; */
-          if (3 != sscanf(p, "%d, %lf, %lf%n", &zn, &zmin, &zmax, &i)) {
-            fprintf(stderr, "Error: invalid histogram z-axis specification [%s]\n", p);
-            goto END;
-          }
-          p += i;
-          dz = (zmax - zmin) / zn;
-        }
-      }
-    }
-  }
-
-  if ( dim == 1 ) {
-    fprintf(stdout, "# hist1D: x: %s ; weight: %s ; xbins (%d, %g, %g)\n",
-        sx, (sw ? sw : "1"), xn, xmin, xmax);
-  } else if ( dim == 2 ) {
-    fprintf(stdout, "# hist2D: x: %s ; y: %s ; weight: %s ; xbins (%d, %g, %g) ; ybins (%d, %g, %g)\n",
-        sx, sy, (sw ? sw : "1"), xn, xmin, xmax, yn, ymin, ymax);
-  } else if ( dim == 3 ) {
-    fprintf(stdout, "# hist3D: x: %s ; y: %s ; z: %s ; weight: %s ; xbins (%d, %g, %g) ; ybins (%d, %g, %g) ; zbins (%d, %g, %g)\n",
-        sx, sy, sz, (sw ? sw : "1"), xn, xmin, xmax, yn, ymin, ymax, zn, zmin, zmax);
-  }
-
-  hn = xn;
-  if ( dim >= 2 ) hn *= yn;
-  if ( dim >= 3 ) hn *= zn;
+  hn = pm->xn;
+  if ( pm->dim >= 2 ) hn *= pm->yn;
+  if ( pm->dim >= 3 ) hn *= pm->zn;
   if ( (hist = calloc(hn, sizeof(*hist))) == NULL) exit(-1);
   for ( i = 0; i < hn; i++ ) hist[i] = 0;
 
-  if ((fp = fopen(dfname, "r")) == NULL ) {
-    fprintf(stderr, "Error: cannot read %s\n", dfname);
+  if ( (fp = fopen(pm->dfname, "r")) == NULL ) {
+    fprintf(stderr, "Error: cannot read %s\n", pm->dfname);
     goto END;
   }
 
   /* read file line by line */
   while ( file_read_long_line(&buf, &bufsz, fp) ) {
-    if (buf[0] == '#' || buf[0] == '!') continue;
+    if ( buf[0] == '#' || buf[0] == '!' ) continue;
     p = strtok(buf, delims);
-    for ( col = 0; col < colmax && p != NULL; col++ ) {
+    data[0] = ++lineid;
+    for ( col = 1; col <= pm->colmax && p != NULL; col++ ) {
       data[col] = atof(p);
       p = strtok(NULL, delims);
       //fprintf(stderr, "%g ", data[col]);
     }
 
     /* compute the index */
-    x = hist_expr_eval_postfix(px, data, col);
-    ix = ( x >= xmin ) ? ( x - xmin ) / dx : -1;
+    x = hist_expr_eval_postfix(pm->px, data, col);
+    ix = ( x >= pm->xmin ) ? (int) (( x - pm->xmin ) / pm->dx) : -1;
     i = ix;
-    if ( ix < xn ) {
-      if ( dim >= 2 ) {
-        i *= yn;
-        y = hist_expr_eval_postfix(py, data, col);
-        iy = ( y >= ymin ) ? ( y - ymin ) / dy : -1;
-        if ( iy < yn ) {
+    if ( ix < pm->xn ) {
+      if ( pm->dim >= 2 ) {
+        i *= pm->yn;
+        y = hist_expr_eval_postfix(pm->py, data, col);
+        iy = ( y >= pm->ymin ) ? (int) (( y - pm->ymin ) / pm->dy) : -1;
+        if ( iy < pm->yn ) {
           i += iy;
-          if ( dim >= 3 ) {
-            i *= zn;
-            z = hist_expr_eval_postfix(pz, data, col);
-            iz = ( z >= zmin ) ? ( z - zmin ) / dz : -1;
-            if ( iz < zn ) {
+          if ( pm->dim >= 3 ) {
+            i *= pm->zn;
+            z = hist_expr_eval_postfix(pm->pz, data, col);
+            iz = ( z >= pm->zmin ) ? (int) (( z - pm->zmin ) / pm->dz) : -1;
+            if ( iz < pm->zn ) {
               i += iz;
             } else {
               i = -1;
@@ -748,7 +856,7 @@ static int hist_from_file(const char *command, const char *dfname, const param_t
       i = -1;
     }
     if ( i >= 0 ) {
-      w = ( pw != NULL ) ? hist_expr_eval_postfix(pw, data, col) : 1.0;
+      w = ( pm->pw != NULL ) ? hist_expr_eval_postfix(pm->pw, data, col) : 1.0;
       //fprintf(stderr, " |  %d %g\n", i, w);
       hist[i] += w;
       wtot += w;
@@ -762,30 +870,30 @@ static int hist_from_file(const char *command, const char *dfname, const param_t
   } else if ( pm->normalize == 1 ) {
     norm = 1.0/wtot;
   } else {
-    double dvol = dx;
-    if ( dim >= 2 ) dvol *= dy;
-    if ( dim >= 3 ) dvol *= dz;
+    double dvol = pm->dx;
+    if ( pm->dim >= 2 ) dvol *= pm->dy;
+    if ( pm->dim >= 3 ) dvol *= pm->dz;
     norm = 1.0/(wtot*dvol);
   }
-  if ( dim == 1 ) { /* 1D histogram */
-    for ( i = 0 ; i < xn; i++ ) {
-      printf("%g %g\n", xmin + (i + w) * dx, hist[i]*norm);
+  if ( pm->dim == 1 ) { /* 1D histogram */
+    for ( i = 0 ; i < pm->xn; i++ ) {
+      printf("%g %g\n", pm->xmin + (i + w) * pm->dx, hist[i]*norm);
     }
-  } else if ( dim == 2 ) { /* 2D histogram */
-    for ( i = 0, ix = 0; ix < xn; ix++ ) {
-      for ( iy = 0; iy < yn; iy++, i++ ) {
-        printf("%g %g %g\n", xmin + (ix + w) * dx,
-            ymin + (iy + w) * dy, hist[i]*norm);
+  } else if ( pm->dim == 2 ) { /* 2D histogram */
+    for ( i = 0, ix = 0; ix < pm->xn; ix++ ) {
+      for ( iy = 0; iy < pm->yn; iy++, i++ ) {
+        printf("%g %g %g\n", pm->xmin + (ix + w) * pm->dx,
+               pm->ymin + (iy + w) * pm->dy, hist[i]*norm);
       }
       printf("\n");
     }
-  } else if ( dim == 3 ) { /* 3D histogram */
-    for ( i = 0, ix = 0; ix < xn; ix++ ) {
-      for ( iy = 0; iy < yn; iy++, i++ ) {
-        for ( iz = 0; iz < zn; iz++, i++ ) {
-          printf("%g %g %g %g\n", xmin + (ix + w) * dx,
-              ymin + (iy + w) * dy, zmin + (iz + w) * dz,
-              hist[i]*norm);
+  } else if ( pm->dim == 3 ) { /* 3D histogram */
+    for ( i = 0, ix = 0; ix < pm->xn; ix++ ) {
+      for ( iy = 0; iy < pm->yn; iy++, i++ ) {
+        for ( iz = 0; iz < pm->zn; iz++, i++ ) {
+          printf("%g %g %g %g\n", pm->xmin + (ix + w) * pm->dx,
+                 pm->ymin + (iy + w) * pm->dy, pm->zmin + (iz + w) * pm->dz,
+                 hist[i]*norm);
         }
       }
       printf("\n");
@@ -797,8 +905,6 @@ END:
   free(hist);
   free(buf);
   free(data);
-  free(sxyz);
-  free(px); free(py); free(pz); free(pw);
   return 0;
 }
 
@@ -834,7 +940,11 @@ int main(int argc, char **argv)
 
   if ( param_parse(&pm, argc, argv) != EXIT_SUCCESS )
     return EXIT_FAILURE;
-  hist_from_file(pm.command, pm.dfname, &pm);
+  /* get parameters from the histogram command */
+  if ( hist_parse_command(&pm, stdout) != EXIT_SUCCESS )
+    return EXIT_FAILURE;
+  hist_from_file(&pm);
+  param_free(&pm);
 
   return EXIT_SUCCESS;
 }
