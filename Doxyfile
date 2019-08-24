@@ -1,18 +1,23 @@
 PROJECT_NAME           = "WaveformAnalysis"
 PROJECT_BRIEF          = "Waveform Analysis Utilities"
-INPUT                  = . README.txt
 OUTPUT_DIRECTORY       = ./dox
+USE_MDFILE_AS_MAINPAGE = ./README.md
 FULL_PATH_NAMES        = NO
 JAVADOC_AUTOBRIEF      = YES
 QT_AUTOBRIEF           = YES
 RECURSIVE              = YES
-EXCLUDE                = ./tinyscheme
+SOURCE_BROWSER         = YES
+VERBATIM_HEADERS       = YES
+EXCLUDE                = ./dox
+EXCLUDE_PATTERNS       = */top*/* */build
 USE_MATHJAX            = YES
+HTML_EXTRA_STYLESHEET  = ./doc/doxygen_extra.css
 PAPER_TYPE             = letter
-LATEX_EXTRA_STYLESHEET = ./Doxylatexsheet.tex
+LATEX_EXTRA_STYLESHEET = ./doc/Doxylatexsheet.tex
 GENERATE_MAN           = YES
 HAVE_DOT               = YES
 CALL_GRAPH             = YES
 CALLER_GRAPH           = YES
 DOT_IMAGE_FORMAT       = svg
 INTERACTIVE_SVG        = YES
+#TAGFILES               = ./doc/doxytag/opencv.tag=http://docs.opencv.org/master ./doc/doxytag/libstdc++.tag=https://gcc.gnu.org/onlinedocs/libstdc++/latest-doxygen

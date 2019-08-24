@@ -1,0 +1,4 @@
+div.fragment, div.contents p, div.line, table.memberdecls, .memTemplParams, code {
+    font-size: initial !important;
+    font-family: "Lucida Console", Monaco, monospace;
+}
