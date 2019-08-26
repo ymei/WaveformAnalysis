@@ -8,9 +8,10 @@
  * We organize arrays in the C row major fashion.
  * If the handle is not properly initialized or is freed, marray==NULL
  */
-typedef struct mrdary_handle 
+typedef struct mrdary_handle
 {
     FILE *fp;
+    char *linebuf;
     size_t column;
     size_t row;
     size_t rowmax;

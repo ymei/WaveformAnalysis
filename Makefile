@@ -1,11 +1,11 @@
 OSTYPE = $(shell uname)
 ARCH   = $(shell uname -m)
 ##################################### Defaults ################################
-CC             := gcc
+CC             := clang
 INCLUDE        := -I. -I/usr/local/include
-CFLAGS         := -Wall -Wno-overlength-strings -std=c99 -pedantic -O3
+CFLAGS         := -Wall -Wno-overlength-strings -Wpedantic -std=c99 -fPIC -O3
 CFLAGS_32      := -m32
-SHLIB_CFLAGS   := -fPIC -shared
+SHLIB_CFLAGS   := -shared
 SHLIB_EXT      := .so
 LIBS           := -L/opt/local/lib -lm
 LDFLAGS        :=
@@ -35,7 +35,7 @@ ifneq ($(OSTYPE), Linux)
     CC      = clang
     GLLIBS += -lGL -lGLU -lglut
   else ifeq ($(OSTYPE), SunOS)
-      CFLAGS := -c -Wall -std=c99 -pedantic
+      CFLAGS := -c -Wall -std=c99 -Wpedantic
   else
       # Let's assume this is win32
       SHLIB_EXT           := .dll
@@ -58,20 +58,20 @@ endif
 ############################ Define targets ###################################
 EXE_TARGETS = analyzeWaveform waveview spectraFilter hist
 DEBUG_EXE_TARGETS = hdf5rawWaveformIo utils filters runScriptNGetConfig
-# SHLIB_TARGETS = XXX$(SHLIB_EXT)
+SHLIB_TARGETS = libWavAna$(SHLIB_EXT)
 
 ifeq ($(ARCH), x86_64) # compile a 32bit version on 64bit platforms
-  # SHLIB_TARGETS += XXX_m32$(SHLIB_EXT)
+  SHLIB_TARGETS += libWavAna_m32$(SHLIB_EXT)
 endif
 
-.PHONY: exe_targets shlib_targets debug_exe_targets dox clean
+default: exe_targets shlib_targets
 exe_targets: $(EXE_TARGETS)
 shlib_targets: $(SHLIB_TARGETS)
 debug_exe_targets: $(DEBUG_EXE_TARGETS)
+.PHONY: default exe_targets shlib_targets debug_exe_targets dox clean
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
-
 hist: hist.o
 	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@
 spectraFilter: spectraFilter.o filters.o mreadarray.o utils.o
@@ -103,15 +103,10 @@ demuxdump: demuxdump.c hdf5rawWaveformIo.o
 	$(CC) $(CFLAGS) $(INCLUDE) $^ $(LIBS) $(LDFLAGS) -o $@
 waveview: waveview.c hdf5rawWaveformIo.o
 	$(CC) $(CFLAGS) $(INCLUDE) -Wno-deprecated-declarations $^ $(LIBS) $(GLLIBS) $(LDFLAGS) -o $@
-# libmreadarray$(SHLIB_EXT): mreadarray.o
-# 	$(CC) $(SHLIB_CFLAGS) $(CFLAGS) $(LIBS) -o $@ $<
-# mreadarray.o: mreadarray.c
-# 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
-# mreadarray: mreadarray.c
-# 	$(CC) $(CFLAGS) -DENABLEMAIN $(INCLUDE) $(LIBS) -o $@ $<
-# libmreadarray_m32$(SHLIB_EXT): mreadarray.c
-# 	$(CC) -m32 $(SHLIB_CFLAGS) $(CFLAGS) $(CFLAGS_32) -o $@ $<
-
+libWavAna$(SHLIB_EXT): filters.o mreadarray.o peakFinder.o utils.o
+	$(CC) $(CFLAGS) $(SHLIB_CFLAGS) $(LIBS) -o $@ $^
+libWavAna_m32$(SHLIB_EXT): mreadarray.c
+	$(CC) -m32 $(CFLAGS) $(CFLAGS_32) $(SHLIB_CFLAGS) -o $@ $<
 dox:
 	doxygen
 clean:

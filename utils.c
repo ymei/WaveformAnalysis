@@ -13,7 +13,7 @@ void rand_init(uint64_t j)
 {
     rand_v = 4101842887655102017LL;
     rand_w = 1LL;
-    
+
     rand_u = j ^ rand_v; rand_int64();
     rand_v = rand_u; rand_int64();
     rand_w = rand_v; rand_int64();
@@ -22,7 +22,7 @@ void rand_init(uint64_t j)
 uint64_t rand_int64()
 {
     uint64_t x;
-    
+
     rand_u = rand_u * 2862933555777941757LL + 7046029254386353087LL;
     rand_v ^= rand_v >> 17; rand_v ^= rand_v << 31; rand_v ^= rand_v >> 8;
     rand_w = 4294957665U*(rand_w & 0xffffffff) + (rand_w >> 32);
@@ -74,7 +74,7 @@ double *rand_gaussnd(size_t n, const double *L, const double *mean, double *pt)
 #define RAND_GAUSSND_NMAX 1024
 #endif /* for efficiency */
     double spt[RAND_GAUSSND_NMAX];
-    
+
     ssize_t i, j;
     double u, v, x, y, q;
     for(i=0; i<n; i++) { /* fill vector spt of independent normal deviates. */
@@ -149,7 +149,7 @@ int cholesky_decomp(const double *a, size_t n, double **L)
     if(*L == NULL) {
         (*L) = (double*)calloc(n*n, sizeof(double));
         if(*L == NULL) {
-            error_printf("%s(): *L allocation failure.\n", __FUNCTION__);
+            error_printf("%s(): *L allocation failure.\n", __func__);
             return 0;
         }
     }
@@ -160,7 +160,7 @@ int cholesky_decomp(const double *a, size_t n, double **L)
             for(sum=el[i*n+j],k=i-1; k>=0; k--) sum -= el[i*n+k] * el[j*n+k];
             if(i == j) {
                 if(sum <= 0.0) {
-                    error_printf("%s(): a is not positive-definite.\n", __FUNCTION__);
+                    error_printf("%s(): a is not positive-definite.\n", __func__);
                     return 0;
                 }
                 el[i*n+i] = sqrt(sum);

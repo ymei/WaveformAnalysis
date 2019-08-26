@@ -99,8 +99,8 @@ config_parameters_t *get_config_parameters(const char *fName)
     ssize_t i;
     scheme *sc;
     pointer rv;
-    long rv_i;
-    double rv_r;
+    long rv_i=0;
+    double rv_r=0.0;
     config_parameters_t *cParms;
 
     sc = tinyscheme_init(fName);
@@ -146,7 +146,7 @@ static void build_completion_list(scheme *sc)
         error_printf("calloc oblist_names error.\n");
         return;
     }
-    
+
     j = 0;
     for(i=0; i<sc->vptr->vector_length(sc->oblist); i++) {
         scp = sc->vptr->vector_elem(sc->oblist, i);

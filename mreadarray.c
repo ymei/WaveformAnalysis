@@ -29,6 +29,8 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <limits.h>
 #include <float.h>
 #include <math.h>
@@ -50,11 +52,44 @@
 
 static const int sizeof_size_t = sizeof(size_t);
 
+/** Read a long line from file.
+ * @param[inout] s string of the line, is allocated when s==NULL and n==0 and grown as needed.
+ * @param[inout] n current size of s
+ * @return s
+ */
+static char *file_read_long_line(char **s, size_t *n, FILE *fp)
+{
+    const int bufsz = LINE_MAX;
+    char *p;
+    size_t cnt, sz;
+
+    if ( *s == NULL && *n == 0 ) {
+        *n = bufsz;
+        if ( (*s = calloc(*n, sizeof(char))) == NULL ) exit(-1);
+    }
+    p = *s;
+    sz = *n;
+    while ( 1 ) {
+        if ( fgets(p, sz, fp) == NULL ) return NULL;
+        cnt = strlen(*s);
+        if ( (*s)[cnt-1] == '\n' ) {
+            break;
+        } else { /* line too long, expand the buffer */
+            *n += bufsz;
+            if ( (*s = realloc(*s, (*n)*sizeof(char))) == NULL ) exit(-1);
+            p = *s + cnt;
+            sz = bufsz;
+        }
+    }
+    return *s;
+}
+
 mrdary_hdl *mrdary_init_f(const char *fname, size_t rowmax)
 {
     mrdary_hdl *hdl=NULL;
-    char buf[LINE_MAX]={0}, *p;
+    char *p, *p1;
     int i;
+    size_t n;
     FILE *fp;
 
     if((fp=fopen(fname, "r"))==NULL) {
@@ -65,18 +100,22 @@ mrdary_hdl *mrdary_init_f(const char *fname, size_t rowmax)
     hdl = malloc(sizeof(mrdary_hdl));
     hdl->marray = NULL;
     hdl->fp = fp;
+    if((hdl->linebuf = (char*)calloc(LINE_MAX, sizeof(char))) == NULL)
+        return NULL;
 
     /* read the first effective line
      * and determine the number of columns
      */
     hdl->column = 0;
     while(!feof(fp)) {
-        if(fgets(buf, LINE_MAX, fp)==NULL)
-            break;
-        if(buf[0]=='#' || buf[0]=='%')
+        if(file_read_long_line(&hdl->linebuf, &n, fp)==NULL)
+            break; /* EOF */
+        if(hdl->linebuf[0]=='#' || hdl->linebuf[0]=='%'
+           || hdl->linebuf[0]=='\n' || hdl->linebuf[0]=='\r')
             continue;
-        p = buf;
-        while((p-buf) < strlen(buf)) {
+        p = p1 = hdl->linebuf;
+        p1 += strlen(hdl->linebuf);
+        while(p < p1) {
             for(;blankq(*p);p++);
             for(;!blankq(*p);p++);
             hdl->column++;
@@ -102,26 +141,30 @@ mrdary_hdl *mrdary_init_f(const char *fname, size_t rowmax)
 
 size_t mrdary_read_all(mrdary_hdl *hdl)
 {
-    char buf[LINE_MAX]={0}, *p, *pn;
+    char *p, *p1, *pn;
     FILE *fp;
     double v;
     int i;
+    size_t n;
 
     if(hdl->row != 0) {
-        fprintf(stderr, "%s error: hdl->row = %zd != 0\n", __FUNCTION__, hdl->row);
+        fprintf(stderr, "%s error: hdl->row = %zd != 0\n", __func__, hdl->row);
         return 0;
     }
-
     fp = hdl->fp;
 
     while(!feof(fp)) {
-        if(fgets(buf, LINE_MAX, fp)==NULL)
-            break;
-        if(buf[0]=='#' || buf[0]=='%')
+        if(file_read_long_line(&hdl->linebuf, &n, fp)==NULL)
+            break; /* EOF */
+        if(hdl->linebuf[0]=='#' || hdl->linebuf[0]=='%')
             continue;
-        p = buf;
+        if(hdl->linebuf[0]=='\n' || hdl->linebuf[0]=='\r') { /* empty line */
+            continue;
+        }
+        p = p1 = hdl->linebuf;
+        p1 += strlen(hdl->linebuf);
         i = 0;
-        while((p-buf) < strlen(buf)) {
+        while(p < p1) {
             v = strtod(p, &pn);
             if(pn == p) break; /* no conversion occured */
             p = pn;
@@ -139,7 +182,7 @@ size_t mrdary_read_all(mrdary_hdl *hdl)
             hdl->marray[hdl->column*hdl->row + i] = v;
             i++;
             if(i > hdl->column) {
-                fprintf(stderr, "%s error: i=%d > hdl->column=%zd\n", __FUNCTION__, i, hdl->column);
+                fprintf(stderr, "%s error: i=%d > hdl->column=%zd\n", __func__, i, hdl->column);
                 hdl->row++;
                 return hdl->row;
             }
@@ -175,7 +218,7 @@ double *mrdary_value_mn(mrdary_hdl *hdl, size_t m, size_t n)
 {
     if(m>=hdl->row || n>=hdl->column) {
         fprintf(stderr, "%s error: (%zd, %zd) not inside of (%zd, %zd)\n",
-                __FUNCTION__, m, n, hdl->row, hdl->column);
+                __func__, m, n, hdl->row, hdl->column);
         return NULL;
     }
     return (hdl->marray + m*hdl->column + n);

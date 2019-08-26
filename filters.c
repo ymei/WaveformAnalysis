@@ -46,7 +46,7 @@ filters_t *filters_init_for_convolution(ANALYSIS_WAVEFORM_BASE_TYPE *inWav, size
     filters_t *fHdl;
 
     if((np > 0) && (np % 2 == 0)) {
-        error_printf("%s(): np = %zd is not odd!\n", __FUNCTION__, np);
+        error_printf("%s(): np = %zd is not odd!\n", __func__, np);
         return NULL;
     }
 
@@ -130,7 +130,7 @@ int filters_SavitzkyGolay(filters_t *fHdl, int m, int ld)
 
     np = fHdl->respLen;
     if(np<1 || np<m-1 || np%2==0 || ld>m || np!=fHdl->respLen) {
-        error_printf("%s(): improper arguments, returning...\n", __FUNCTION__);
+        error_printf("%s(): improper arguments, returning...\n", __func__);
         return 1;
     }
 
@@ -197,7 +197,7 @@ int filters_raisedCosine(filters_t *fHdl, int nf, int norm)
 
     if(nf<=0) nf = 1;
     if(nf%2==0 || nf>fHdl->respLen) {
-        error_printf("%s(): improper arguments, nf (=%d) must be odd and <= fHdl->respLen.\n", __FUNCTION__, nf);
+        error_printf("%s(): improper arguments, nf (=%d) must be odd and <= fHdl->respLen.\n", __func__, nf);
         return 1;
     }
     coef = 1.0;
@@ -240,7 +240,7 @@ int filters_freqResp_raisedCosine(filters_t *fHdl, int nf, int np)
 
     if(nf<=0) nf = 1;
     if(np<1 || nf>np || np>fHdl->fftLen/2) {
-        error_printf("%s(): improper arguments, must have nf (=%d) <= np (=%d) <= fHdl->fftLen/2.\n", __FUNCTION__, nf, np);
+        error_printf("%s(): improper arguments, must have nf (=%d) <= np (=%d) <= fHdl->fftLen/2.\n", __func__, nf, np);
         return 1;
     }
     coef= 1.0/sqrt(2.0);
@@ -455,7 +455,7 @@ int filters_iir_butterworth_lowhighpass(filters_t *fHdl, int order, double fc)
 int filters_iir_butterworth_band(filters_t *fHdl, int order, double fl, double fh)
 {
     if(order % 4 || fl >= fh) {
-        error_printf("%s(): improper arguments, order(=%d) must be 4, 8, 16... and fl(=%g)<fh(=%g).\n", __FUNCTION__, order, fl, fh);
+        error_printf("%s(): improper arguments, order(=%d) must be 4, 8, 16... and fl(=%g)<fh(=%g).\n", __func__, order, fl, fh);
         return 1;
     }
     int pass;
