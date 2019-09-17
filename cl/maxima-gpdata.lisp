@@ -1,5 +1,5 @@
-;;;; The functions in this file reads gnuplot's datafile style data
-;;;; into maxima's lists and matrices.
+;;;; The functions in this file reads/writes gnuplot's datafile style
+;;;; data into maxima's lists and matrices.
 (if (find-package 'maxima) ; A poor way of finding if it is in maxima.
     (in-package :maxima)
     (in-package :cl-user))
@@ -20,7 +20,7 @@
 |#
 
 (declaim (optimize (speed 3) (debug 0) (safety 0)))
-(defvar *commentschars* "#!%")
+(defvar *commentschars* "#!%") ; the first element will be used in output.
 (defvar *blankchars* '(#\Space #\Tab #\Linefeed #\Page #\Return))
 
 (defun first-nonblank-is-commentschar-p (s)
@@ -80,3 +80,28 @@
 
 (defun $read_gpdata (fname)
   (read-gpdata-file fname))
+
+;;; Write lists and matrices into gnuplot data file.
+(defun write-gpdata-stream (stream val)
+  (when (consp (car val))
+    (if (atom (cadr val))
+        (progn
+          (mapcar (lambda (v) (format stream " ~24,16,3,,,,'EE" v)) (cdr val))
+          (format stream "~%"))
+        (if (eql (caar val) '$matrix)
+            (progn
+              (format stream "~a Matrix~%" (elt *commentschars* 0))
+              (mapcar (lambda (v) (write-gpdata-stream stream v))
+                      (cdr val))
+              (format stream "~%"))
+            (progn
+              (format stream "~a List~%" (elt *commentschars* 0))
+              (mapcar (lambda (v) (write-gpdata-stream stream v))
+                      (cdr val)))))))
+(defun write-gpdata-file (fname val)
+  (with-open-file (outfile fname :direction :output :if-exists :supersede)
+    (write-gpdata-stream outfile val)))
+
+(defun $write_gpdata (fname val)
+  (write-gpdata-file fname val)
+  fname)
