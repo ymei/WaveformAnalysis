@@ -939,17 +939,17 @@ static int hist_from_file(param_t *pm)
 
     /* compute the histogram index */
     ix = ( pm->x >= pm->xmin ) ? (int) (( pm->x - pm->xmin ) / pm->dx) : -1;
-    i = ( ix < pm->xn ) ? ix : -1;
+    i = (ix >= 0 && ix < pm->xn ) ? ix : -1;
     if ( i >= 0 && pm->dim >= 2 ) {
       iy = ( pm->y >= pm->ymin ) ? (int) (( pm->y - pm->ymin ) / pm->dy) : -1;
-      i = ( iy < pm->yn ) ? i * pm->yn + iy : -1;
+      i = ( iy >= 0 && iy < pm->yn ) ? i * pm->yn + iy : -1;
       if ( i >= 0 && pm->dim >= 3 ) {
         iz = ( pm->z >= pm->zmin ) ? (int) (( pm->z - pm->zmin ) / pm->dz) : -1;
-        i = ( iz < pm->zn ) ? i * pm->zn + iz : -1;
+        i = ( iz >= 0 && iz < pm->zn ) ? i * pm->zn + iz : -1;
       }
     }
     if ( i >= 0 ) {
-      //fprintf(stderr, " |  %d %g\n", i, w);
+      //fprintf(stderr, " |  %d %g\n", i, pm->w);
       hist[i] += pm->w;
       wtot += pm->w;
     }
@@ -981,7 +981,7 @@ static int hist_from_file(param_t *pm)
     }
   } else if ( pm->dim == 3 ) { /* 3D histogram */
     for ( i = 0, ix = 0; ix < pm->xn; ix++ ) {
-      for ( iy = 0; iy < pm->yn; iy++, i++ ) {
+      for ( iy = 0; iy < pm->yn; iy++ ) {
         for ( iz = 0; iz < pm->zn; iz++, i++ ) {
           printf("%g %g %g %g\n", pm->xmin + (ix + del) * pm->dx,
                  pm->ymin + (iy + del) * pm->dy, pm->zmin + (iz + del) * pm->dz,
